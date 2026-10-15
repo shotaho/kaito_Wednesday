@@ -192,6 +192,7 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     <div class="me">
       <div class="row"><span>お皿</span><span class="plate" id="plate">●●●</span></div>
       <div class="row"><span>武器</span><span id="weapon">おもちゃの刀</span></div>
+      <div class="row"><span>捕球</span><span id="glove">できない</span></div>
       <div class="row"><span>手持ちボール</span><span id="carry">0 / 100</span></div>
       <div class="bar"><i id="carryBar"></i></div>
       <div class="row">
@@ -214,6 +215,7 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
         <dt>攻撃</dt><dd>道具でお皿をたたくとボールが落ちる。ほかの接触(体当たりなど)は禁止</dd>
         <dt>牢屋</dt><dd>お皿のボールが0になると相手陣地の牢屋へ。ボールを持った仲間が牢屋の柵にさわると復活</dd>
         <dt>武器</dt><dd>箱や草むらにバット・物干し竿・ピコハンが隠れている。箱は攻撃で開く</dd>
+        <dt>捕球</dt><dd>最初はボールを拾えない。マップに隠された捕球スイッチを踏むとグローブがもらえて、ボールを拾える(空中のボールもキャッチ)。牢屋に入るとグローブはなくなる</dd>
         <dt>召喚</dt><dd>拾ったボールを100個使うと、戦車・ヘリコプター・飛行機のどれかが来て相手を攻撃</dd>
         <dt>PC</dt><dd><kbd>WASD</kbd> 移動、マウス(クリックでロック)か <kbd>←</kbd><kbd>→</kbd> で視点、クリック/<kbd>Space</kbd> 攻撃、<kbd>Q</kbd> 召喚</dd>
         <dt>スマホ</dt><dd>左側ドラッグで移動、右側ドラッグで視点、右側タップか攻撃ボタンで攻撃</dd>
@@ -291,6 +293,14 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     [800, 560, 62], [1600, 1040, 62], [950, 1100, 58], [1450, 500, 58],
     [640, 1450, 55], [1760, 150, 55],
   ].map(([x, y, r]) => ({ x, y, r }));
+
+  // 捕球スイッチ(草むらの中や木の陰に隠してある。近づかないと見えない)
+  const SWITCHES = [
+    [365, 1395], [2035, 205],   // 陣地の草むらの中
+    [915, 1125], [1485, 475],   // 中盤の草むらの中
+    [455, 1095], [1945, 505],   // 木の陰
+  ].map(([x, y]) => ({ x, y }));
+  const SWITCH_SEEN = 170;      // この距離まで近づくと見える
 
   // ================= 便利関数 =================
   const $ = (id) => document.getElementById(id);
@@ -377,6 +387,7 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
           swingT: 0, cd: 0, inv: 0, jailed: false, rescueCd: 0, step: Math.random() * 6,
           speed: isHuman ? 215 : rnd(170, 200),
           ai: { role: pick(['attack', 'attack', 'rescue', 'collect']), think: Math.random() * 0.3, goal: null, mode: '', target: null, lastX: x, lastY: y, stuckT: 0, unstuck: 0, uDir: 0 },
+          glove: false, seekAt: isHuman ? 0 : rnd(4, 22),
           stats: { knocks: 0, rescues: 0, picked: 0, summons: 0 },
         });
       }
@@ -387,6 +398,7 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     boxes.push({ x: 1110, y: 800, open: false, content: 'bat', respawn: 0 }, { x: 1290, y: 800, open: false, content: 'pole', respawn: 0 });
     const g = {
       t: 0, size, demo, players, boxes, piles: [], items: [], projectiles: [], bombs: [], vehicles: [], parts: [], floaters: [],
+      switches: SWITCHES.map((w) => ({ x: w.x, y: w.y, pressT: 0 })),
       spawnT: 0, banner: { text: '', t: 0 }, over: false,
     };
     for (let i = 0; i < 14; i++) { const s = freeSpot(10); g.piles.push({ x: s.x, y: s.y, n: Math.ceil(rnd(2, 7)), z: 0, vx: 0, vy: 0, vz: 0, age: 9 }); }
@@ -436,7 +448,7 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     return true;
   }
   function sendToJail(e, by) {
-    e.jailed = true; e.plate = 0; e.inv = 0;
+    e.jailed = true; e.plate = 0; e.inv = 0; e.glove = false;
     let c = e.carry; e.carry = 0;
     while (c > 0) { const n = Math.min(c, 6); c -= n; G.piles.push({ x: e.x + rnd(-30, 30), y: e.y + rnd(-30, 30), n, z: 30, vx: rnd(-60, 60), vy: rnd(-60, 60), vz: 100, age: 0 }); }
     const j = jails[1 - e.team];
@@ -542,8 +554,11 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
       if (it) { goal = it; m = 'item'; }
       else if (ai.role !== 'attack') { const b = nearestOf(p, G.boxes.filter((b) => !b.open), 520); if (b) { goal = b; m = 'box'; target = b; } }
     }
+    if (!goal && !p.glove && G.t > p.seekAt && !(e && dE < 200)) {
+      goal = nearestOf(p, G.switches); m = 'switch';
+    }
     if (!goal) {
-      const pile = nearestOf(p, G.piles.filter((q) => q.age > 0.4), 360);
+      const pile = p.glove ? nearestOf(p, G.piles.filter((q) => q.age > 0.4), 360) : null;
       if (e && (dE < 430 || ai.role === 'attack' || !pile)) { goal = e; m = 'fight'; target = e; }
       else if (pile) { goal = pile; m = 'collect'; }
       else { if (!ai.wander || Math.random() < 0.1) ai.wander = freeSpot(PLAYER_R); goal = ai.wander; }
@@ -703,10 +718,22 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
       if (d < m) { const push = (m - d) / 2; a.x -= dx / d * push; a.y -= dy / d * push; b.x += dx / d * push; b.y += dy / d * push; }
     }
 
+    for (const w of G.switches) w.pressT = Math.max(0, w.pressT - dt);
     for (const p of G.players) {
       if (p.jailed) continue;
-      for (const pl of G.piles) {
-        if (pl.age > 0.35 && pl.n > 0 && pl.z <= 0 && Math.hypot(pl.x - p.x, pl.y - p.y) < PLAYER_R + 12) {
+      if (!p.glove) {
+        for (const w of G.switches) {
+          if (Math.hypot(w.x - p.x, w.y - p.y) < PLAYER_R + 16) {
+            p.glove = true; w.pressT = 0.5;
+            burst(w.x, w.y, '#ffcf3a', 12, 140, 0.3);
+            if (p.human) { floater(p.x, p.y, 'グローブを手に入れた!'); log('捕球スイッチを押した!ボールを拾えるようになった', p.team); sfx.rescue(); }
+            break;
+          }
+        }
+      }
+      // ボールを拾えるのはグローブを持っている人だけ(空中のボールもキャッチできる)
+      if (p.glove) for (const pl of G.piles) {
+        if (pl.age > 0.35 && pl.n > 0 && Math.hypot(pl.x - p.x, pl.y - p.y) < PLAYER_R + 12) {
           p.carry += pl.n; p.stats.picked += pl.n; pl.n = 0;
           if (p.human) sfx.pick();
         }
@@ -1034,6 +1061,8 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     body.add(mesh(GEO.plate, mat('#f4f6f8'), 0, 1.72, 0));
     const plateBalls = [[0, 0.11, -0.12], [0, 0.11, 0.12], [-0.02, 0.22, 0]].map(([x, y, z]) => { const b = mesh(GEO.ball, ballMat, x, 1.72 + y, z); body.add(b); return b; });
     const pivot = new THREE.Group(); pivot.position.set(0.05, 0.92, 0.38); body.add(pivot);
+    const glove = mesh(new THREE.SphereGeometry(0.17, 12, 10), mat('#a8642e'), 0.12, 0.92, -0.4);
+    glove.scale.set(1, 0.8, 1.25); glove.visible = false; body.add(glove);
     const trail = new THREE.Mesh(new THREE.RingGeometry(0.1, 0.12, 24, 1, 0, 1), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false }));
     trail.rotation.x = -Math.PI / 2; trail.position.y = 0.92; body.add(trail);
     const label = sprite(p.human ? 'あなた' : p.name, { color: p.human ? '#1f2a37' : T.dark, size: 52 }, 0.36);
@@ -1044,7 +1073,7 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
       const marker = new THREE.Mesh(GEO.ring, new THREE.MeshBasicMaterial({ color: '#ffcf3a', transparent: true, opacity: 0.9, depthWrite: false }));
       marker.rotation.x = -Math.PI / 2; marker.position.y = 0.03; root.add(marker);
     }
-    return { root, body, legL, legR, plateBalls, pivot, trail, help, weaponType: null, weapon: null };
+    return { root, body, legL, legR, plateBalls, pivot, trail, help, glove, weaponType: null, weapon: null };
   }
 
   function makeTank(v) {
@@ -1095,7 +1124,16 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     holder.add(spin, glow);
     return { root: holder, spin };
   }
-  function makeFloater(f) { const s = sprite(f.text, { color: f.color, size: 56 }, 0.5); return { root: s, sprite: s }; }
+  function makeSwitch() {
+    const g = new THREE.Group();
+    const baseMat = new THREE.MeshLambertMaterial({ color: '#ffcf3a', transparent: true, opacity: 0 });
+    const btnMat = new THREE.MeshLambertMaterial({ color: '#e0483a', transparent: true, opacity: 0 });
+    g.add(mesh(new THREE.CylinderGeometry(0.42, 0.46, 0.06, 20), baseMat, 0, 0.03, 0, false));
+    const btn = mesh(new THREE.CylinderGeometry(0.22, 0.24, 0.14, 18), btnMat, 0, 0.13, 0, false);
+    g.add(btn);
+    return { root: g, btn, mats: [baseMat, btnMat] };
+  }
+  function makeFloater(f) { const s = sprite(f.text, { color: f.color, size: 56 }, 0.5); s.material.depthTest = false; s.renderOrder = 10; return { root: s, sprite: s }; }
 
   // エンティティ配列と3Dオブジェクトを対応させる
   const views = new Map();
@@ -1114,7 +1152,7 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
   const tmpM = new THREE.Matrix4(), tmpQ = new THREE.Quaternion(), tmpS = new THREE.Vector3(), tmpP = new THREE.Vector3(), tmpC = new THREE.Color();
   function syncScene(dt) {
     frameNo++;
-    sync(G.players, makePlayer); sync(G.boxes, makeBox); sync(G.items, makeItem); sync(G.bombs, makeBomb); sync(G.floaters, makeFloater);
+    sync(G.players, makePlayer); sync(G.switches, makeSwitch); sync(G.boxes, makeBox); sync(G.items, makeItem); sync(G.bombs, makeBomb); sync(G.floaters, makeFloater);
     sync(G.vehicles, (v) => (v.type === 'tank' ? makeTank : v.type === 'heli' ? makeHeli : makePlane)(v));
     sweep();
 
@@ -1144,6 +1182,18 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
         v.trail.visible = false;
       }
       v.help.visible = p.jailed && Math.sin(G.t * 2 + p.id) > 0.2;
+      v.glove.visible = p.glove && !p.jailed;
+    }
+    const me = human();
+    for (const w of G.switches) {
+      const v = views.get(w);
+      v.root.position.set(wx(w.x), 0, wz(w.y));
+      // 近づいた時だけ見える
+      const d = Math.hypot(me.x - w.x, me.y - w.y);
+      const target = G.demo ? 0 : clamp((SWITCH_SEEN - d) / 60, 0, 1);
+      for (const m of v.mats) m.opacity += (target - m.opacity) * 0.2;
+      v.root.visible = v.mats[0].opacity > 0.02;
+      v.btn.position.y = w.pressT > 0 ? 0.07 : 0.13;
     }
     for (const b of G.boxes) {
       const v = views.get(b);
@@ -1250,7 +1300,7 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
   function updateHud() {
     const h = human();
     const remain = Math.max(0, MATCH_TIME - G.t);
-    const key = [active(0).length, active(1).length, Math.ceil(remain), h.plate, h.weapon, h.carry, h.jailed, G.banner.t > 0 ? G.banner.text : ''].join('|');
+    const key = [active(0).length, active(1).length, Math.ceil(remain), h.plate, h.weapon, h.carry, h.jailed, h.glove, G.banner.t > 0 ? G.banner.text : ''].join('|');
     if (key === hudCache) return;
     hudCache = key;
     $('blueCount').textContent = `${active(0).length}/${G.size}`;
@@ -1258,6 +1308,7 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     $('timer').textContent = `${Math.floor(remain / 60)}:${String(Math.floor(remain % 60)).padStart(2, '0')}`;
     $('plate').textContent = '●'.repeat(h.plate) + '○'.repeat(PLATE_MAX - h.plate);
     $('weapon').textContent = WEAPONS[h.weapon].name;
+    $('glove').textContent = h.glove ? 'できる(グローブ)' : 'スイッチを探そう';
     $('carry').textContent = `${h.carry} / ${VEHICLE_COST}`;
     $('carryBar').style.width = `${Math.min(100, h.carry / VEHICLE_COST * 100)}%`;
     const ready = h.carry >= VEHICLE_COST && !h.jailed;
