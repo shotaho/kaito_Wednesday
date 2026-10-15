@@ -165,6 +165,32 @@ kbd { font-family: var(--font-body); font-weight: 800; font-size: 11px; border: 
 }
 .start:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
 .error { color: var(--red); font-weight: 800; }
+.field { display: flex; gap: 8px; align-items: center; font-weight: 800; font-size: 14px; flex-wrap: wrap; }
+.field input, .join input {
+  font: inherit; font-weight: 800; color: var(--ink); background: #fff;
+  border: 2px solid var(--ink); border-radius: 8px; padding: 6px 10px; min-width: 0;
+}
+.field input { width: 10em; }
+.join { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.join input { width: 6.5em; text-transform: uppercase; letter-spacing: .2em; font-family: var(--font-display); font-weight: 400; }
+.modes { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.start.alt { background: var(--red); }
+.start.ghost { background: var(--paper); color: var(--ink); }
+.start.small { font-size: 16px; padding: 6px 18px; }
+.start:disabled { opacity: .45; cursor: not-allowed; }
+.note { font-size: 12px; line-height: 1.6; opacity: .8; }
+.code { font-family: var(--font-display); letter-spacing: .15em; color: var(--red); }
+.teams { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tcol { border: 2px solid var(--ink); border-radius: 10px; padding: 8px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.tcol.blue { background: rgba(47, 111, 214, .1); }
+.tcol.red { background: rgba(224, 72, 58, .1); }
+.tcol h3 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 18px; }
+.tcol.blue h3 { color: var(--blue); } .tcol.red h3 { color: var(--red); }
+.tcol ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: 14px; font-weight: 800; min-height: 1.4em; }
+.tcol li { overflow-wrap: anywhere; }
+.tcol li.mine { text-decoration: underline; text-decoration-thickness: 2px; }
+.tpick { font: inherit; font-weight: 800; font-size: 13px; cursor: pointer; border: 2px solid var(--ink); border-radius: 999px; padding: 3px 10px; background: var(--paper); color: var(--ink); justify-self: start; }
+.tpick[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
 button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .summon.ready { animation: none; } }
 @media (max-width: 560px) {
@@ -220,14 +246,55 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
         <dt>PC</dt><dd><kbd>WASD</kbd> 移動、マウス(クリックでロック)か <kbd>←</kbd><kbd>→</kbd> で視点、クリック/<kbd>Space</kbd> 攻撃、<kbd>Q</kbd> 召喚</dd>
         <dt>スマホ</dt><dd>左側ドラッグで移動、右側ドラッグで視点、右側タップか攻撃ボタンで攻撃</dd>
       </dl>
-      <div class="opts" role="radiogroup" aria-label="人数">
+      <div class="field"><label for="nameInput">なまえ</label><input id="nameInput" maxlength="8" autocomplete="off" value="カイト"></div>
+      <div class="opts" role="radiogroup" aria-label="ひとりで遊ぶときの人数">
         <span>人数</span>
         <label><input type="radio" name="size" id="size3" value="3"> 3対3</label>
         <label><input type="radio" name="size" id="size5" value="5" checked> 5対5</label>
         <label><input type="radio" name="size" id="size8" value="8"> 8対8</label>
       </div>
       <p class="error" id="loadError" hidden>3D表示の読み込みに失敗しました。ネット接続を確認して、ページを再読み込みしてください。</p>
-      <button class="start" id="startBtn" type="button">バトル開始</button>
+      <div class="modes">
+        <button class="start" id="startBtn" type="button">ひとりで遊ぶ</button>
+        <button class="start alt" id="hostBtn" type="button">部屋をつくる</button>
+      </div>
+      <div class="join">
+        <input id="codeInput" maxlength="4" autocomplete="off" placeholder="コード" aria-label="部屋コード">
+        <button class="start ghost small" id="joinBtn" type="button">部屋に入る</button>
+      </div>
+      <p class="note" id="netNote">同じWiFiにつないだスマホやパソコンで対戦できます。だれか1人が「部屋をつくる」を押して、出てきた4文字のコードをみんなに伝えてください。</p>
+      <p class="error" id="netError" role="alert" hidden></p>
+    </div>
+  </div>
+
+  <div class="overlay" id="lobby" hidden>
+    <div class="card">
+      <div class="eyebrow">ROOM</div>
+      <h2>部屋コード <span class="code" id="roomCode">----</span></h2>
+      <p id="lobbyHint">同じWiFiにつないだ人にこのコードを伝えてください。</p>
+      <div class="teams">
+        <div class="tcol blue">
+          <h3>青組</h3>
+          <button class="tpick" id="pickBlue" type="button" aria-pressed="true">青組に入る</button>
+          <ul id="listBlue"></ul>
+        </div>
+        <div class="tcol red">
+          <h3>赤組</h3>
+          <button class="tpick" id="pickRed" type="button" aria-pressed="false">赤組に入る</button>
+          <ul id="listRed"></ul>
+        </div>
+      </div>
+      <div class="opts" id="lobbySize" role="radiogroup" aria-label="各チームの人数">
+        <span>各チーム</span>
+        <label><input type="radio" name="lsize" id="lsize3" value="3"> 3人</label>
+        <label><input type="radio" name="lsize" id="lsize5" value="5" checked> 5人</label>
+        <label><input type="radio" name="lsize" id="lsize8" value="8"> 8人</label>
+      </div>
+      <p class="note" id="lobbySizeNote">足りない人数はボットが入ります。</p>
+      <div class="modes">
+        <button class="start" id="lobbyStart" type="button">バトル開始</button>
+        <button class="start ghost small" id="leaveBtn" type="button">部屋を出る</button>
+      </div>
     </div>
   </div>
 
@@ -243,6 +310,7 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 (() => {
   'use strict';
@@ -368,26 +436,34 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     boom: () => beep(120, 0.35, 'sawtooth', 0.08, -70),
     summon: () => [392, 523, 659, 784].forEach((f, i) => setTimeout(() => beep(f, 0.2, 'sawtooth', 0.05), i * 90)),
     open: () => beep(700, 0.12, 'triangle', 0.06, 400),
+    fire: () => beep(160, 0.15, 'square', 0.06, -60),
   };
 
   // ================= 状態 =================
   let mode = 'title';
   let G = null;
 
-  function newMatch(size, demo = false) {
-    const players = [];
+  // roster: 人が操作する選手 [{ name, team, ctrl }]。ctrl は操作する端末のID。足りない分はボット
+  function newMatch(size, demo = false, roster = []) {
+    const players = [], teamSize = [0, 0];
     for (let t = 0; t < 2; t++) {
-      for (let i = 0; i < size; i++) {
-        const isHuman = !demo && t === 0 && i === 0;
+      const humans = roster.filter((r) => r.team === t);
+      const n = Math.max(size, humans.length);
+      teamSize[t] = n;
+      const used = new Set(humans.map((h) => h.name));
+      const botNames = NAMES[t].concat(NAMES[1 - t]).filter((nm) => !used.has(nm));
+      for (let i = 0; i < n; i++) {
+        const hum = humans[i];
+        const ctrl = hum ? hum.ctrl : null;
         const x = t === 0 ? 180 + (i % 2) * 90 : MAP_W - 180 - (i % 2) * 90;
-        const y = MAP_H / 2 + (i - (size - 1) / 2) * Math.min(110, 900 / size);
+        const y = MAP_H / 2 + (i - (n - 1) / 2) * Math.min(110, 900 / n);
         players.push({
-          id: players.length, team: t, name: NAMES[t][i], human: isHuman,
+          id: players.length, team: t, name: hum ? hum.name : (botNames.shift() || `ボット${i + 1}`), ctrl,
           x, y, face: t === 0 ? 0 : Math.PI, plate: PLATE_MAX, carry: 0, weapon: 'sword',
           swingT: 0, cd: 0, inv: 0, jailed: false, rescueCd: 0, step: Math.random() * 6,
-          speed: isHuman ? 215 : rnd(170, 200),
+          speed: ctrl ? 215 : rnd(170, 200),
           ai: { role: pick(['attack', 'attack', 'rescue', 'collect']), think: Math.random() * 0.3, goal: null, mode: '', target: null, lastX: x, lastY: y, stuckT: 0, unstuck: 0, uDir: 0 },
-          glove: false, seekAt: isHuman ? 0 : rnd(4, 22),
+          glove: false, seekAt: ctrl ? 0 : rnd(4, 22),
           stats: { knocks: 0, rescues: 0, picked: 0, summons: 0 },
         });
       }
@@ -397,19 +473,34 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     for (let i = boxes.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [boxes[i].content, boxes[j].content] = [boxes[j].content, boxes[i].content]; }
     boxes.push({ x: 1110, y: 800, open: false, content: 'bat', respawn: 0 }, { x: 1290, y: 800, open: false, content: 'pole', respawn: 0 });
     const g = {
-      t: 0, size, demo, players, boxes, piles: [], items: [], projectiles: [], bombs: [], vehicles: [], parts: [], floaters: [],
+      t: 0, teamSize, demo, players, boxes, piles: [], items: [], projectiles: [], bombs: [], vehicles: [], parts: [], floaters: [],
       switches: SWITCHES.map((w) => ({ x: w.x, y: w.y, pressT: 0 })),
       spawnT: 0, banner: { text: '', t: 0 }, over: false,
     };
     for (let i = 0; i < 14; i++) { const s = freeSpot(10); g.piles.push({ x: s.x, y: s.y, n: Math.ceil(rnd(2, 7)), z: 0, vx: 0, vy: 0, vz: 0, age: 9 }); }
     return g;
   }
-  const human = () => G.players.find((p) => p.human) || G.players[0];
+  const isMe = (p) => !!p.ctrl && p.ctrl === NET.myId;
+  const human = () => G.players.find(isMe) || G.players[0];
   const active = (t) => G.players.filter((p) => p.team === t && !p.jailed);
 
   // ================= ゲームの出来事 =================
-  function log(text, team) {
-    if (G.demo) return;
+  // 画面に出す出来事はすべて emit を通す。ホストは同じ出来事を参加者にも送る
+  function emit(ev) { applyEvent(ev); if (NET.role === 'host' && !G.demo) NET.events.push(ev); }
+  // 特定の選手(を操作している人)だけに届ける。ボットには何もしない
+  function personal(p, ev) { if (p.ctrl) emit(Object.assign(ev, { to: p.ctrl })); }
+  function applyEvent(ev) {
+    if (ev.to && ev.to !== NET.myId) return;
+    switch (ev.k) {
+      case 'log': if (!G.demo) showLog(ev.text, ev.team); break;
+      case 'banner': G.banner = { text: ev.text, t: 2.6 }; break;
+      case 'float': if (G.floaters.length < 30) G.floaters.push({ x: ev.x, y: ev.y, h: 2.3, text: ev.text, color: ev.color, t: 1 }); break;
+      case 'burst': spawnBurst(ev.x, ev.y, ev.c, ev.n, ev.s, ev.h); break;
+      case 'sfx': if (sfx[ev.n] && (ev.to || ev.x === undefined || audible(ev.x, ev.y))) sfx[ev.n](); break;
+      case 'end': showResult(ev); break;
+    }
+  }
+  function showLog(text, team) {
     const el = document.createElement('div');
     el.textContent = text;
     if (team !== undefined) el.style.setProperty('--c', TEAM[team].color);
@@ -417,9 +508,11 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     while (box.children.length > 4) box.lastChild.remove();
     setTimeout(() => el.remove(), 5000);
   }
-  function banner(text) { G.banner = { text, t: 2.6 }; }
-  function floater(x, y, text, color = '#1f2a37') { if (G.floaters.length < 30) G.floaters.push({ x, y, h: 2.3, text, color, t: 1 }); }
-  function burst(x, y, color, n = 10, spd = 160, h = 1) {
+  function log(text, team) { emit({ k: 'log', text, team }); }
+  function banner(text) { emit({ k: 'banner', text }); }
+  function floater(x, y, text, color = '#1f2a37') { emit({ k: 'float', x: r1(x), y: r1(y), text, color }); }
+  function burst(x, y, color, n = 10, spd = 160, h = 1) { emit({ k: 'burst', x: r1(x), y: r1(y), c: color, n, s: spd, h }); }
+  function spawnBurst(x, y, color, n, spd, h) {
     for (let i = 0; i < n && G.parts.length < 380; i++) {
       const a = Math.random() * Math.PI * 2, s = rnd(0.3, 1) * spd;
       G.parts.push({ x, y, h, vx: Math.cos(a) * s, vy: Math.sin(a) * s, vh: rnd(1.5, 5), life: rnd(0.4, 0.8), color });
@@ -443,7 +536,7 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     floater(e.x, e.y, `-${lost}`, TEAM[e.team].color);
     burst(e.x, e.y, '#ffcf3a', 6, 120, 1.7);
     if (attacker) attacker.stats.knocks += lost;
-    if (audible(e.x, e.y)) sfx.hit();
+    emit({ k: 'sfx', n: 'hit', x: e.x, y: e.y });
     if (e.plate <= 0) sendToJail(e, attacker);
     return true;
   }
@@ -454,7 +547,7 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     const j = jails[1 - e.team];
     e.x = rnd(j.x + 30, j.x + j.w - 30); e.y = rnd(j.y + 30, j.y + j.h - 30);
     log(`${e.name}(${TEAM[e.team].name})が牢屋へ${by ? `  ← ${by.name}` : ''}`, 1 - e.team);
-    if (e.human || audible(e.x, e.y)) sfx.jail();
+    personal(e, { k: 'sfx', n: 'jail' });
     checkWin();
   }
   function rescue(p, prisoner) {
@@ -465,13 +558,13 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     resolveWorld(prisoner, PLAYER_R);
     burst(prisoner.x, prisoner.y, TEAM[p.team].color, 14, 180);
     log(`${p.name}が${prisoner.name}を助けた!`, p.team);
-    if (p.human || prisoner.human || audible(p.x, p.y)) sfx.rescue();
+    emit({ k: 'sfx', n: 'rescue', x: p.x, y: p.y });
   }
   function swing(p) {
     const W_ = WEAPONS[p.weapon];
     if (p.cd > 0 || p.jailed) return;
     p.cd = W_.cd; p.swingT = 0.2;
-    if (p.human) sfx.swing();
+    personal(p, { k: 'sfx', n: 'swing' });
     for (const e of G.players) {
       if (e.team === p.team || e.jailed) continue;
       if (dist(p, e) <= W_.range + PLAYER_R && angDiff(Math.atan2(e.y - p.y, e.x - p.x), p.face) <= W_.arc / 2 + 0.25) hitPlayer(e, W_.knock, p, p.x, p.y);
@@ -484,7 +577,7 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
   function openBox(b) {
     b.open = true; b.respawn = 35;
     burst(b.x, b.y, '#c49a5c', 12, 150, 0.5);
-    if (audible(b.x, b.y)) sfx.open();
+    emit({ k: 'sfx', n: 'open', x: b.x, y: b.y });
     if (b.content === 'balls') { G.piles.push({ x: b.x, y: b.y, n: 15, z: 20, vx: 0, vy: 0, vz: 160, age: 0 }); floater(b.x, b.y, 'ボール×15'); }
     else if (b.content === 'empty') floater(b.x, b.y, 'からっぽ');
     else { G.items.push({ x: b.x, y: b.y, type: b.content }); floater(b.x, b.y, WEAPONS[b.content].name + '!'); }
@@ -499,9 +592,9 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     if (type === 'plane') G.vehicles.push({ type, team: t, x: 0, y: 0, dir: 1, passes: 3, acc: 0, owner: p, started: false, t: 99 });
     banner(`${TEAM[t].name} ${VEHICLES[type]} 出動!`);
     log(`${p.name}がボール100個で${VEHICLES[type]}を呼んだ`, t);
-    sfx.summon();
+    emit({ k: 'sfx', n: 'summon' });
   }
-  function tryHumanSummon() { if (mode === 'play') summon(human()); }
+  function tryHumanSummon() { if (mode !== 'play') return; if (NET.role === 'client') NET.inSeq.s++; else summon(human()); }
 
   function checkWin() {
     if (G.over) return;
@@ -511,20 +604,28 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
   function endMatch(winner, reason) {
     G.over = true;
     if (G.demo) return;
+    const stats = {}, teams = {};
+    for (const p of G.players) if (p.ctrl) { stats[p.ctrl] = p.stats; teams[p.ctrl] = p.team; }
+    emit({ k: 'end', winner, reason, counts: [active(0).length, active(1).length], stats, teams });
+  }
+  function showResult(ev) {
     mode = 'result';
     releaseLock();
-    const h = human();
-    $('resEyebrow').textContent = winner === null ? 'DRAW' : winner === 0 ? 'YOU WIN' : 'YOU LOSE';
-    $('resTitle').textContent = winner === null ? '引き分け' : `${TEAM[winner].name}の勝ち!`;
-    $('resText').textContent = reason;
+    const myTeam = ev.teams[NET.myId] ?? human().team;
+    const st = ev.stats[NET.myId] || { knocks: 0, rescues: 0, picked: 0, summons: 0 };
+    const win = ev.winner === myTeam;
+    $('resEyebrow').textContent = ev.winner === null ? 'DRAW' : win ? 'YOU WIN' : 'YOU LOSE';
+    $('resTitle').textContent = ev.winner === null ? '引き分け' : `${TEAM[ev.winner].name}の勝ち!`;
+    $('resText').textContent = ev.reason;
     $('resStats').innerHTML = `
-      <span>落としたボール</span><span>${h.stats.knocks}</span>
-      <span>助けた仲間</span><span>${h.stats.rescues}</span>
-      <span>拾ったボール</span><span>${h.stats.picked}</span>
-      <span>召喚した乗り物</span><span>${h.stats.summons}</span>
-      <span>最後の人数(青/赤)</span><span>${active(0).length} / ${active(1).length}</span>`;
+      <span>落としたボール</span><span>${st.knocks}</span>
+      <span>助けた仲間</span><span>${st.rescues}</span>
+      <span>拾ったボール</span><span>${st.picked}</span>
+      <span>召喚した乗り物</span><span>${st.summons}</span>
+      <span>最後の人数(青/赤)</span><span>${ev.counts[0]} / ${ev.counts[1]}</span>`;
+    $('againBtn').textContent = NET.role === 'solo' ? 'もう一回' : '部屋にもどる';
     setTimeout(() => { $('hud').hidden = true; $('result').hidden = false; $('againBtn').focus({ preventScroll: true }); }, 900);
-    (winner === 0 ? sfx.rescue : sfx.jail)();
+    (win ? sfx.rescue : sfx.jail)();
   }
 
   // ================= AI =================
@@ -680,23 +781,16 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
         endMatch(b0 === b1 ? null : b0 > b1 ? 0 : 1, `時間切れ。残り人数が同じ ${a0} 人で、お皿のボールは ${b0} 対 ${b1}`);
       }
     }
-    const humanMove = G.demo ? null : readMove(dt);
+    localMove = G.demo ? { x: 0, y: 0 } : readMove(dt);
 
     for (const p of G.players) {
       p.cd = Math.max(0, p.cd - dt); p.inv = Math.max(0, p.inv - dt); p.swingT = Math.max(0, p.swingT - dt); p.rescueCd = Math.max(0, p.rescueCd - dt);
       let mv;
-      if (p.human) {
-        mv = humanMove;
-        if (input.attack && !p.jailed) {
-          // 視点の前方にいる相手(いなければ箱)へ自動で向く
-          const W_ = WEAPONS[p.weapon];
-          const inFront = (o) => angDiff(Math.atan2(o.y - p.y, o.x - p.x), cam.yaw) < 1.9;
-          const foe = nearestOf(p, active(1 - p.team).filter(inFront), W_.range + 70);
-          const box = foe ? null : nearestOf(p, G.boxes.filter((b) => !b.open && inFront(b)), W_.range + 50);
-          const t = foe || box;
-          p.face = t ? Math.atan2(t.y - p.y, t.x - p.x) : cam.yaw;
-          swing(p);
-        }
+      if (p.ctrl) {
+        const c = ctrlInput(p);
+        mv = c.mv;
+        if (c.summon) summon(p);
+        if (c.attack && !p.jailed) ctrlAttack(p, c.yaw);
       } else mv = botMove(p, dt);
       const m = Math.hypot(mv.x, mv.y);
       if (m > 0.05) {
@@ -726,7 +820,9 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
           if (Math.hypot(w.x - p.x, w.y - p.y) < PLAYER_R + 16) {
             p.glove = true; w.pressT = 0.5;
             burst(w.x, w.y, '#ffcf3a', 12, 140, 0.3);
-            if (p.human) { floater(p.x, p.y, 'グローブを手に入れた!'); log('捕球スイッチを押した!ボールを拾えるようになった', p.team); sfx.rescue(); }
+            personal(p, { k: 'float', x: r1(p.x), y: r1(p.y), text: 'グローブを手に入れた!', color: '#1f2a37' });
+            personal(p, { k: 'log', text: '捕球スイッチを押した!ボールを拾えるようになった', team: p.team });
+            personal(p, { k: 'sfx', n: 'rescue' });
             break;
           }
         }
@@ -735,16 +831,17 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
       if (p.glove) for (const pl of G.piles) {
         if (pl.age > 0.35 && pl.n > 0 && Math.hypot(pl.x - p.x, pl.y - p.y) < PLAYER_R + 12) {
           p.carry += pl.n; p.stats.picked += pl.n; pl.n = 0;
-          if (p.human) sfx.pick();
+          personal(p, { k: 'sfx', n: 'pick' });
         }
       }
       for (const it of G.items) {
         if (it.taken || it.type === p.weapon || (it.noPick === p.id && it.noT > 0)) continue;
-        if (!p.human && p.weapon !== 'sword') continue;
+        if (!p.ctrl && p.weapon !== 'sword') continue;
         if (Math.hypot(it.x - p.x, it.y - p.y) < PLAYER_R + 16) {
           if (p.weapon !== 'sword') G.items.push({ x: p.x, y: p.y, type: p.weapon, noPick: p.id, noT: 1.5 });
           p.weapon = it.type; it.taken = true;
-          if (p.human) { floater(p.x, p.y, WEAPONS[it.type].name + 'を手に入れた'); sfx.open(); }
+          personal(p, { k: 'float', x: r1(p.x), y: r1(p.y), text: WEAPONS[it.type].name + 'を手に入れた', color: '#1f2a37' });
+          personal(p, { k: 'sfx', n: 'open' });
         }
       }
       if (p.carry >= 1 && p.rescueCd <= 0) {
@@ -775,11 +872,34 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
 
     updateVehicles(dt);
 
+    updateFx(dt);
+  }
+  function updateFx(dt) {
     for (const p of G.parts) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.94; p.vy *= 0.94; p.h = Math.max(0.05, p.h + p.vh * dt); p.vh -= 12 * dt; p.life -= dt; }
     G.parts = G.parts.filter((p) => p.life > 0);
     for (const f of G.floaters) { f.h += 0.9 * dt; f.t -= dt; }
     G.floaters = G.floaters.filter((f) => f.t > 0);
     if (G.banner.t > 0) G.banner.t -= dt;
+  }
+  // 人が操作する選手の入力(自分はこの端末の入力、参加者は届いた入力)
+  let localMove = { x: 0, y: 0 };
+  function ctrlInput(p) {
+    if (p.ctrl === NET.myId) return { mv: localMove, attack: input.attack, yaw: cam.yaw, summon: false };
+    const inp = NET.inputs[p.ctrl];
+    if (!inp) return { mv: { x: 0, y: 0 }, attack: false, yaw: p.face, summon: false };
+    const attack = inp.a > inp.aDone, summ = inp.s > inp.sDone;
+    inp.aDone = inp.a; inp.sDone = inp.s;
+    return { mv: { x: inp.mx, y: inp.my }, attack, yaw: inp.yaw, summon: summ };
+  }
+  // 視点の前方にいる相手(いなければ箱)へ自動で向いて攻撃
+  function ctrlAttack(p, yaw) {
+    const W_ = WEAPONS[p.weapon];
+    const inFront = (o) => angDiff(Math.atan2(o.y - p.y, o.x - p.x), yaw) < 1.9;
+    const foe = nearestOf(p, active(1 - p.team).filter(inFront), W_.range + 70);
+    const box = foe ? null : nearestOf(p, G.boxes.filter((b) => !b.open && inFront(b)), W_.range + 50);
+    const t = foe || box;
+    p.face = t ? Math.atan2(t.y - p.y, t.x - p.x) : yaw;
+    swing(p);
   }
 
   function updateVehicles(dt) {
@@ -797,7 +917,7 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
           if (v.fire <= 0 && dist(v, target) < 700) {
             v.fire = 1.0;
             G.projectiles.push({ x: v.x + Math.cos(a) * 50, y: v.y + Math.sin(a) * 50, vx: Math.cos(a) * 520, vy: Math.sin(a) * 520, team: v.team, life: 1.6, owner: v.owner });
-            if (audible(v.x, v.y)) beep(160, 0.15, 'square', 0.06, -60);
+            emit({ k: 'sfx', n: 'fire', x: v.x, y: v.y });
           }
         }
         for (const e of foes) if (dist(v, e) < 44) hitPlayer(e, 1, v.owner, v.x, v.y);
@@ -834,7 +954,7 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
         b.done = true;
         for (const e of active(1 - b.team)) if (Math.hypot(e.x - b.x, e.y - b.y) < b.r) hitPlayer(e, 1, b.owner, b.x, b.y);
         burst(b.x, b.y, '#ffffff', 14, 260, 0.3); burst(b.x, b.y, '#ffcf3a', 10, 200, 0.3);
-        if (audible(b.x, b.y)) sfx.boom();
+        emit({ k: 'sfx', n: 'boom', x: b.x, y: b.y });
       }
     }
     G.bombs = G.bombs.filter((b) => !b.done);
@@ -935,8 +1055,8 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     g.beginPath(); g.moveTo(420, 30); g.lineTo(420, MAP_H - 30); g.moveTo(MAP_W - 420, 30); g.lineTo(MAP_W - 420, MAP_H - 30); g.stroke();
     g.setLineDash([]);
     g.font = '64px "Mochiy Pop One", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = 'rgba(255,255,255,.85)';
-    g.save(); g.translate(210, MAP_H / 2 + 300); g.rotate(-Math.PI / 2); g.fillText('青組陣地', 0, 0); g.restore();
-    g.save(); g.translate(MAP_W - 210, MAP_H / 2 - 300); g.rotate(Math.PI / 2); g.fillText('赤組陣地', 0, 0); g.restore();
+    g.save(); g.translate(210, MAP_H / 2 + 300); g.rotate(Math.PI / 2); g.fillText('青組陣地', 0, 0); g.restore();
+    g.save(); g.translate(MAP_W - 210, MAP_H / 2 - 300); g.rotate(-Math.PI / 2); g.fillText('赤組陣地', 0, 0); g.restore();
     jails.forEach((j) => { g.fillStyle = 'rgba(90,70,50,.25)'; g.fillRect(j.x, j.y, j.w, j.h); });
     const t = new THREE.CanvasTexture(c);
     t.anisotropy = renderer.capabilities.getMaxAnisotropy();
@@ -1065,11 +1185,11 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     glove.scale.set(1, 0.8, 1.25); glove.visible = false; body.add(glove);
     const trail = new THREE.Mesh(new THREE.RingGeometry(0.1, 0.12, 24, 1, 0, 1), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false }));
     trail.rotation.x = -Math.PI / 2; trail.position.y = 0.92; body.add(trail);
-    const label = sprite(p.human ? 'あなた' : p.name, { color: p.human ? '#1f2a37' : T.dark, size: 52 }, 0.36);
+    const label = sprite(isMe(p) ? 'あなた' : p.ctrl ? `★${p.name}` : p.name, { color: p.ctrl ? '#1f2a37' : T.dark, size: 52 }, 0.36);
     label.position.y = 2.3; root.add(label);
     const help = sprite('たすけて!', { bg: '#fffaf0', size: 48 }, 0.42);
     help.position.y = 2.75; help.visible = false; root.add(help);
-    if (p.human) {
+    if (isMe(p)) {
       const marker = new THREE.Mesh(GEO.ring, new THREE.MeshBasicMaterial({ color: '#ffcf3a', transparent: true, opacity: 0.9, depthWrite: false }));
       marker.rotation.x = -Math.PI / 2; marker.position.y = 0.03; root.add(marker);
     }
@@ -1287,8 +1407,8 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     mctx.fillStyle = 'rgba(79,154,74,.8)'; for (const t of trees) { mctx.beginPath(); mctx.arc(t.x * s, t.y * s, t.r * s, 0, Math.PI * 2); mctx.fill(); }
     for (const p of G.players) {
       mctx.fillStyle = TEAM[p.team].color;
-      mctx.beginPath(); mctx.arc(p.x * s, p.y * s, p.human ? 7 : 5, 0, Math.PI * 2); mctx.fill();
-      if (p.human) {
+      mctx.beginPath(); mctx.arc(p.x * s, p.y * s, isMe(p) ? 7 : 5, 0, Math.PI * 2); mctx.fill();
+      if (isMe(p)) {
         mctx.strokeStyle = '#1f2a37'; mctx.lineWidth = 2.5; mctx.stroke();
         mctx.beginPath(); mctx.moveTo(p.x * s, p.y * s); mctx.lineTo(p.x * s + Math.cos(cam.yaw) * 18, p.y * s + Math.sin(cam.yaw) * 18); mctx.stroke();
       }
@@ -1303,8 +1423,8 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     const key = [active(0).length, active(1).length, Math.ceil(remain), h.plate, h.weapon, h.carry, h.jailed, h.glove, G.banner.t > 0 ? G.banner.text : ''].join('|');
     if (key === hudCache) return;
     hudCache = key;
-    $('blueCount').textContent = `${active(0).length}/${G.size}`;
-    $('redCount').textContent = `${active(1).length}/${G.size}`;
+    $('blueCount').textContent = `${active(0).length}/${G.teamSize[0]}`;
+    $('redCount').textContent = `${active(1).length}/${G.teamSize[1]}`;
     $('timer').textContent = `${Math.floor(remain / 60)}:${String(Math.floor(remain % 60)).padStart(2, '0')}`;
     $('plate').textContent = '●'.repeat(h.plate) + '○'.repeat(PLATE_MAX - h.plate);
     $('weapon').textContent = WEAPONS[h.weapon].name;
@@ -1319,27 +1439,343 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
   }
 
   // ================= 進行 =================
-  function start() {
-    const size = Number(document.querySelector('input[name="size"]:checked')?.value || 5);
+  // ================= 通信(同じWiFiで対戦) =================
+  // 部屋をつくった端末(ホスト)がゲームを動かし、参加者は入力を送って、ホストから届く状態を表示する。
+  // 接続の手続きだけ PeerJS の公開サーバーを使い、ゲームのデータは端末どうしで直接やりとりする(WebRTC)。
+  const NET = { role: 'solo', myId: 'me', peer: null, conns: new Map(), host: null, inputs: {}, events: [], lobby: [], code: '', myTeam: 0, sendT: 0, inSeq: { a: 0, s: 0 }, inT: 0 };
+  const PEER_PREFIX = 'kaito-wednesday-';
+  const HAS_PEER = typeof window.Peer === 'function';
+  const r1 = (v) => Math.round(v), r2 = (v) => Math.round(v * 100) / 100;
+  const WIDX = Object.keys(WEAPONS), VIDX = Object.keys(VEHICLES);
+  let entId = 1;
+  const nid = (o) => o.nid || (o.nid = entId++);
+  const peerOptions = () => {
+    // ?peerhost=... で自前の PeerJS サーバーも使える(テスト用)
+    const q = new URLSearchParams(location.search), o = { debug: 0 };
+    if (q.get('peerhost')) { o.host = q.get('peerhost'); o.port = Number(q.get('peerport') || 9000); o.path = q.get('peerpath') || '/'; o.secure = q.get('peersecure') === '1'; }
+    return o;
+  };
+  function myName() {
+    const v = ($('nameInput').value || '').trim().slice(0, 8);
+    return v || 'なまえなし';
+  }
+  try { const saved = localStorage.getItem('kaito-name'); if (saved) $('nameInput').value = saved; } catch {}
+  $('nameInput').addEventListener('change', () => { try { localStorage.setItem('kaito-name', myName()); } catch {} });
+
+  function netError(msg) { const el = $('netError'); el.textContent = msg; el.hidden = !msg; }
+  function closeNet() {
+    try { if (NET.peer) NET.peer.destroy(); } catch {}
+    Object.assign(NET, { role: 'solo', myId: 'me', peer: null, host: null, inputs: {}, events: [], lobby: [], code: '' });
+    NET.conns = new Map();
+  }
+  function toTitle(msg) {
+    closeNet();
+    mode = 'title';
+    releaseLock();
+    for (const id of ['hud', 'lobby', 'result']) $(id).hidden = true;
+    $('title').hidden = false;
+    netError(msg || '');
+  }
+  function peerErrorText(err) {
+    const t = err && err.type;
+    if (t === 'peer-unavailable') return '部屋が見つかりません。コードを確かめてください。';
+    if (t === 'browser-incompatible') return 'このブラウザ(またはこの画面)では通信対戦が使えません。GitHub Pages 版をふつうのブラウザで開いてください。';
+    if (t === 'network' || t === 'server-error' || t === 'socket-error' || t === 'socket-closed') return '接続サーバーにつながりません。インターネット接続を確かめてください。';
+    return `通信でエラーが起きました(${t || '不明'})。`;
+  }
+
+  // ---- ロビー ----
+  const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const makeCode = () => Array.from({ length: 4 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
+  const lobbySize = () => Number(document.querySelector('input[name="lsize"]:checked')?.value || 5);
+  function showLobby() {
+    mode = 'lobby';
+    for (const id of ['title', 'hud', 'result']) $(id).hidden = true;
+    $('lobby').hidden = false;
+    $('roomCode').textContent = NET.code;
+    const host = NET.role === 'host';
+    $('lobbyStart').hidden = !host;
+    $('lobbySize').hidden = !host;
+    $('lobbyHint').textContent = host ? '同じWiFiにつないだ人に、このコードを伝えてください。全員そろったら「バトル開始」。' : 'ホストがバトルを始めるまで待ってね。';
+    renderLobby({ list: NET.lobby, size: host ? lobbySize() : NET.lobbySizeSeen || 5 });
+  }
+  function renderLobby(msg) {
+    NET.lobby = msg.list; NET.lobbySizeSeen = msg.size;
+    for (const [t, id] of [[0, 'listBlue'], [1, 'listRed']]) {
+      const ul = $(id); ul.textContent = '';
+      for (const l of msg.list.filter((x) => x.team === t)) {
+        const li = document.createElement('li');
+        li.textContent = l.name + (l.ctrl === 'host' ? '(ホスト)' : '') + (l.ctrl === NET.myId ? '(あなた)' : '');
+        if (l.ctrl === NET.myId) li.className = 'mine';
+        ul.appendChild(li);
+      }
+    }
+    const me = msg.list.find((l) => l.ctrl === NET.myId);
+    if (me) NET.myTeam = me.team;
+    $('pickBlue').setAttribute('aria-pressed', String(NET.myTeam === 0));
+    $('pickRed').setAttribute('aria-pressed', String(NET.myTeam === 1));
+    $('lobbySizeNote').textContent = `各チーム ${msg.size} 人。足りない人数はボットが入ります。`;
+  }
+  function pickTeam(team) {
+    NET.myTeam = team;
+    if (NET.role === 'host') { const me = NET.lobby.find((l) => l.ctrl === 'host'); if (me) me.team = team; broadcastLobby(); }
+    else if (NET.host && NET.host.open) { NET.host.send({ t: 'team', team }); renderLobby({ list: NET.lobby.map((l) => (l.ctrl === NET.myId ? { ...l, team } : l)), size: NET.lobbySizeSeen || 5 }); }
+  }
+  $('pickBlue').addEventListener('click', () => pickTeam(0));
+  $('pickRed').addEventListener('click', () => pickTeam(1));
+  document.querySelectorAll('input[name="lsize"]').forEach((el) => el.addEventListener('change', () => broadcastLobby()));
+  $('leaveBtn').addEventListener('click', () => toTitle());
+
+  // ---- ホスト ----
+  function sendAll(msg) { for (const c of NET.conns.values()) if (c.open) { try { c.send(msg); } catch {} } }
+  function broadcastLobby() {
+    if (NET.role !== 'host') return;
+    const msg = { t: 'lobby', list: NET.lobby, size: lobbySize() };
+    sendAll(msg); renderLobby(msg);
+  }
+  function hostRoom(tries = 0) {
+    if (!HAS_PEER) { netError('通信の部品を読み込めませんでした。インターネット接続を確かめて、再読み込みしてください。'); return; }
+    closeNet();
+    netError('');
+    const code = makeCode();
+    NET.role = 'host'; NET.myId = 'host'; NET.code = code;
+    NET.lobby = [{ ctrl: 'host', name: myName(), team: NET.myTeam }];
+    $('hostBtn').disabled = true;
+    let peer;
+    try { peer = new Peer(PEER_PREFIX + code, peerOptions()); } catch (e) { $('hostBtn').disabled = false; toTitle(peerErrorText({ type: 'browser-incompatible' })); return; }
+    NET.peer = peer;
+    peer.on('open', () => { $('hostBtn').disabled = false; showLobby(); });
+    peer.on('error', (err) => {
+      $('hostBtn').disabled = false;
+      if (err.type === 'unavailable-id' && tries < 5) { hostRoom(tries + 1); return; }
+      if (err.type === 'peer-unavailable') return; // 抜けた参加者あての送信失敗は無視
+      if (mode === 'play' && (err.type === 'network' || err.type === 'server-error')) return; // 試合中は直接つながっているので続ける
+      toTitle(peerErrorText(err));
+    });
+    peer.on('connection', (conn) => {
+      conn.on('open', () => {
+        if (mode === 'play') { try { conn.send({ t: 'full', reason: 'いま試合中です。終わってから入ってください。' }); } catch {} setTimeout(() => conn.close(), 400); return; }
+        NET.conns.set(conn.peer, conn);
+      });
+      conn.on('data', (d) => hostOnData(conn, d));
+      conn.on('close', () => hostDrop(conn.peer));
+      conn.on('error', () => hostDrop(conn.peer));
+    });
+  }
+  function hostOnData(conn, d) {
+    if (!d || typeof d !== 'object') return;
+    const id = conn.peer;
+    if (d.t === 'hello') {
+      NET.lobby = NET.lobby.filter((l) => l.ctrl !== id);
+      NET.lobby.push({ ctrl: id, name: String(d.name || '').trim().slice(0, 8) || 'なまえなし', team: d.team === 1 ? 1 : 0 });
+      broadcastLobby();
+    } else if (d.t === 'team') {
+      const l = NET.lobby.find((x) => x.ctrl === id); if (l) l.team = d.team === 1 ? 1 : 0;
+      broadcastLobby();
+    } else if (d.t === 'in') {
+      const num = (v) => (Number.isFinite(v) ? v : 0);
+      const prev = NET.inputs[id] || { aDone: num(d.a), sDone: num(d.s) };
+      prev.last = performance.now();
+      NET.inputs[id] = Object.assign(prev, { mx: clamp(num(d.mx), -1, 1), my: clamp(num(d.my), -1, 1), yaw: num(d.yaw), a: num(d.a), s: num(d.s) });
+    }
+  }
+  function hostDrop(id) {
+    if (!NET.conns.has(id) && !NET.lobby.some((l) => l.ctrl === id)) return;
+    NET.conns.delete(id);
+    const l = NET.lobby.find((x) => x.ctrl === id);
+    NET.lobby = NET.lobby.filter((x) => x.ctrl !== id);
+    if (G && !G.demo) {
+      const p = G.players.find((q) => q.ctrl === id);
+      if (p) { p.ctrl = null; p.speed = 190; log(`${p.name}が抜けた。ここからはボットが動かす`, p.team); }
+    }
+    if (l) broadcastLobby();
+  }
+  function hostStart() {
+    if (NET.role !== 'host') return;
+    NET.inputs = {}; NET.events = []; NET.startedAt = performance.now() + 4000;
     clearViews();
-    G = newMatch(size);
+    G = newMatch(lobbySize(), false, NET.lobby);
+    sendAll({ t: 'start', teamSize: G.teamSize, boxes: G.boxes.map((b) => [r1(b.x), r1(b.y)]), players: G.players.map((p) => ({ name: p.name, team: p.team, ctrl: p.ctrl, x: r1(p.x), y: r1(p.y) })) });
+    beginPlay();
+  }
+  $('lobbyStart').addEventListener('click', hostStart);
+  function snapshot() {
+    return {
+      t: 's', time: r2(G.t),
+      p: G.players.map((p) => [r1(p.x), r1(p.y), r2(p.face), p.plate, p.carry, WIDX.indexOf(p.weapon), r2(p.swingT), r2(p.inv), p.jailed ? 1 : 0, p.glove ? 1 : 0, r2(p.step)]),
+      pl: G.piles.map((q) => [r1(q.x), r1(q.y), q.n, r1(q.z)]),
+      bx: G.boxes.map((b) => (b.open ? 1 : 0)),
+      it: G.items.map((i) => [nid(i), r1(i.x), r1(i.y), WIDX.indexOf(i.type)]),
+      pr: G.projectiles.map((q) => [r1(q.x), r1(q.y)]),
+      bm: G.bombs.map((b) => [nid(b), r1(b.x), r1(b.y), r2(b.t), b.max, b.r, b.team, b.from]),
+      vh: G.vehicles.map((v) => [nid(v), VIDX.indexOf(v.type), v.team, r1(v.x), r1(v.y), r2(v.ang || 0), v.started === false ? 0 : 1, v.dir || 1, r2(v.rotor || 0)]),
+      sw: G.switches.map((w) => r2(w.pressT)),
+      ev: NET.events.splice(0),
+    };
+  }
+  function hostTick(dt) {
+    // 6秒以上入力が届かない参加者は抜けたとみなす(ボットが代わりに動く)
+    if (mode === 'play' && G && !G.demo) {
+      const now = performance.now();
+      for (const p of G.players) {
+        if (!p.ctrl || p.ctrl === NET.myId) continue;
+        const inp = NET.inputs[p.ctrl], last = inp ? inp.last : NET.startedAt;
+        if (now - last > 6000) { const c = NET.conns.get(p.ctrl); hostDrop(p.ctrl); try { if (c) c.close(); } catch {} }
+      }
+    }
+    NET.sendT -= dt;
+    if (NET.sendT > 0 || !G || G.demo || !NET.conns.size) return;
+    if (mode !== 'play' && !NET.events.length) return;
+    NET.sendT = 0.05;
+    sendAll(snapshot());
+  }
+
+  // ---- 参加者 ----
+  function joinRoom() {
+    const code = ($('codeInput').value || '').trim().toUpperCase();
+    if (!/^[A-Z]{4}$/.test(code)) { netError('4文字の部屋コードを入れてください。'); return; }
+    if (!HAS_PEER) { netError('通信の部品を読み込めませんでした。インターネット接続を確かめて、再読み込みしてください。'); return; }
+    closeNet();
+    netError('');
+    NET.role = 'client'; NET.code = code;
+    $('joinBtn').disabled = true;
+    let peer;
+    try { peer = new Peer(undefined, peerOptions()); } catch (e) { $('joinBtn').disabled = false; toTitle(peerErrorText({ type: 'browser-incompatible' })); return; }
+    NET.peer = peer;
+    const timer = setTimeout(() => { if (NET.role === 'client' && mode === 'title') { $('joinBtn').disabled = false; toTitle('つながりませんでした。同じWiFiにいるか、コードが正しいか確かめてください。'); } }, 12000);
+    peer.on('open', (id) => {
+      NET.myId = id;
+      const conn = peer.connect(PEER_PREFIX + code, { reliable: true, serialization: 'json' });
+      NET.host = conn;
+      conn.on('open', () => {
+        clearTimeout(timer); $('joinBtn').disabled = false;
+        NET.lobby = [{ ctrl: id, name: myName(), team: NET.myTeam }];
+        conn.send({ t: 'hello', name: myName(), team: NET.myTeam });
+        showLobby();
+      });
+      conn.on('data', clientOnData);
+      conn.on('close', () => { if (NET.role === 'client') toTitle('ホストとの通信が切れました。'); });
+    });
+    peer.on('error', (err) => {
+      clearTimeout(timer); $('joinBtn').disabled = false;
+      if (mode === 'play' && (err.type === 'network' || err.type === 'server-error')) return;
+      toTitle(peerErrorText(err));
+    });
+  }
+  function clientOnData(d) {
+    if (!d || typeof d !== 'object') return;
+    if (d.t === 'lobby') renderLobby(d);
+    else if (d.t === 'start') { clientMatch(d); beginPlay(); }
+    else if (d.t === 's') { if (G && G.remote) applySnapshot(d); }
+    else if (d.t === 'full') toTitle(d.reason);
+  }
+  function clientMatch(msg) {
+    clearViews();
+    G = {
+      t: 0, demo: false, remote: true, teamSize: msg.teamSize,
+      players: msg.players.map((q, i) => ({ id: i, team: q.team, name: q.name, ctrl: q.ctrl, x: q.x, y: q.y, tx: q.x, ty: q.y, face: q.team === 0 ? 0 : Math.PI, plate: PLATE_MAX, carry: 0, weapon: 'sword', swingT: 0, inv: 0, jailed: false, glove: false, step: 0, speed: 215 })),
+      boxes: msg.boxes.map(([x, y]) => ({ x, y, open: false })),
+      piles: [], items: [], projectiles: [], bombs: [], vehicles: [], parts: [], floaters: [],
+      switches: SWITCHES.map((w) => ({ x: w.x, y: w.y, pressT: 0 })),
+      banner: { text: '', t: 0 }, over: false,
+    };
+  }
+  function reuse(old, rows, fill) {
+    const m = new Map(old.map((o) => [o.nid, o]));
+    return rows.map((r) => { const o = m.get(r[0]) || { nid: r[0], fresh: true }; fill(o, r); o.fresh = false; return o; });
+  }
+  function applySnapshot(s) {
+    G.t = s.time;
+    const me = human();
+    s.p.forEach((a, i) => {
+      const p = G.players[i]; if (!p) return;
+      const [x, y, face, plate, carry, w, swingT, inv, jailed, glove, step] = a;
+      const jailChanged = !!jailed !== p.jailed;
+      Object.assign(p, { plate, carry, weapon: WIDX[w] || 'sword', swingT, inv, jailed: !!jailed, glove: !!glove });
+      if (p === me) {
+        p.sx = x; p.sy = y;
+        if (jailChanged || Math.hypot(x - p.x, y - p.y) > 140) { p.x = x; p.y = y; }
+        if (swingT > 0) p.face = face;
+      } else { p.tx = x; p.ty = y; p.face = face; p.step = step; }
+    });
+    G.piles = s.pl.map(([x, y, n, z]) => ({ x, y, n, z }));
+    s.bx.forEach((o, i) => { if (G.boxes[i]) G.boxes[i].open = !!o; });
+    G.items = reuse(G.items, s.it, (o, [, x, y, w]) => { o.x = x; o.y = y; o.type = WIDX[w] || 'bat'; });
+    G.projectiles = s.pr.map(([x, y]) => ({ x, y }));
+    G.bombs = reuse(G.bombs, s.bm, (o, [, x, y, t, max, r, team, from]) => Object.assign(o, { x, y, t, max, r, team, from }));
+    G.vehicles = reuse(G.vehicles, s.vh, (o, [, type, team, x, y, ang, started, dir, rotor]) => {
+      const fresh = o.fresh || (o.dir !== undefined && o.dir !== dir);
+      Object.assign(o, { type: VIDX[type], team, tx: x, ty: y, ang, started: !!started, dir, rotor });
+      if (fresh || o.x === undefined || Math.hypot(x - o.x, y - o.y) > 600) { o.x = x; o.y = y; }
+    });
+    s.sw.forEach((v, i) => { if (G.switches[i]) G.switches[i].pressT = v; });
+    for (const ev of s.ev) applyEvent(ev);
+  }
+  function clientUpdate(dt) {
+    const me = human();
+    const mv = readMove(dt);
+    // 自分の動きはすぐ画面に出す(届いたホストの位置に少しずつ合わせる)
+    const m = Math.hypot(mv.x, mv.y);
+    if (m > 0.05) {
+      me.x += mv.x * 215 * dt; me.y += mv.y * 215 * dt; me.step += dt * 12 * m;
+      if (me.swingT <= 0) me.face = Math.atan2(mv.y, mv.x);
+    }
+    if (me.sx !== undefined) { const k = Math.min(1, dt * 4); me.x += (me.sx - me.x) * k; me.y += (me.sy - me.y) * k; }
+    if (me.jailed) { const j = jails[1 - me.team]; me.x = clamp(me.x, j.x + PLAYER_R + 6, j.x + j.w - PLAYER_R - 6); me.y = clamp(me.y, j.y + PLAYER_R + 6, j.y + j.h - PLAYER_R - 6); }
+    else resolveWorld(me, PLAYER_R);
+    for (const p of G.players) if (p !== me) { const k = Math.min(1, dt * 12); p.x += (p.tx - p.x) * k; p.y += (p.ty - p.y) * k; }
+    for (const v of G.vehicles) { const k = Math.min(1, dt * 12); v.x += (v.tx - v.x) * k; v.y += (v.ty - v.y) * k; }
+    for (const b of G.bombs) b.t = Math.max(0, b.t - dt);
+    for (const p of G.players) { p.swingT = Math.max(0, p.swingT - dt); p.inv = Math.max(0, p.inv - dt); }
+    for (const w of G.switches) w.pressT = Math.max(0, w.pressT - dt);
+    if (input.attack) { NET.inSeq.a++; input.attack = false; }
+    NET.inT -= dt;
+    if (NET.inT <= 0 && NET.host && NET.host.open) {
+      NET.inT = 1 / 30;
+      try { NET.host.send({ t: 'in', mx: r2(mv.x), my: r2(mv.y), yaw: r2(cam.yaw), a: NET.inSeq.a, s: NET.inSeq.s }); } catch {}
+    }
+    updateFx(dt);
+  }
+
+  // ---- 試合の開始 ----
+  function beginPlay() {
     mode = 'play'; hudCache = '';
-    cam.yaw = 0; cam.pitch = 0.5;
     const h = human();
-    camera.position.set(wx(h.x) - 8, 6, wz(h.y));
-    $('title').hidden = true; $('result').hidden = true; $('hud').hidden = false;
+    cam.yaw = h.team === 0 ? 0 : Math.PI; cam.pitch = 0.5;
+    camera.position.set(wx(h.x) - Math.cos(cam.yaw) * 8, 6, wz(h.y) - Math.sin(cam.yaw) * 8);
+    for (const id of ['title', 'lobby', 'result']) $(id).hidden = true;
+    $('hud').hidden = false;
     $('touchBtns').hidden = !coarse;
     $('keyHint').hidden = coarse;
     $('lockhint').hidden = coarse || locked();
     $('log').innerHTML = '';
-    banner('バトル開始!');
+    if (NET.role !== 'client') banner('バトル開始!');
+    else G.banner = { text: 'バトル開始!', t: 2.6 };
     beep(660, 0.12, 'triangle', 0.08);
   }
+  function start() {
+    closeNet();
+    netError('');
+    const size = Number(document.querySelector('input[name="size"]:checked')?.value || 5);
+    clearViews();
+    G = newMatch(size, false, [{ name: myName(), team: 0, ctrl: 'me' }]);
+    beginPlay();
+  }
   $('startBtn').addEventListener('click', start);
-  $('againBtn').addEventListener('click', () => { $('result').hidden = true; $('title').hidden = false; mode = 'title'; $('startBtn').focus({ preventScroll: true }); });
+  $('hostBtn').addEventListener('click', () => hostRoom());
+  $('joinBtn').addEventListener('click', joinRoom);
+  $('codeInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom(); });
+  if (!HAS_PEER) { $('hostBtn').disabled = true; $('joinBtn').disabled = true; $('netNote').textContent = '通信の部品を読み込めなかったため、いまは「ひとりで遊ぶ」だけ使えます。'; }
+  $('againBtn').addEventListener('click', () => {
+    $('result').hidden = true;
+    if (NET.role === 'solo') { mode = 'title'; $('title').hidden = false; $('startBtn').focus({ preventScroll: true }); return; }
+    showLobby();
+    if (NET.role === 'host') broadcastLobby();
+  });
+
 
   // デバッグ用: コンソールから __kaito.G で状態を見られる
-  window.__kaito = { get G() { return G; }, summon };
+  window.__kaito = { get G() { return G; }, get NET() { return NET; }, summon };
 
   // タイトル裏ではボットどうしのデモ試合を流す
   G = newMatch(5, true);
@@ -1348,13 +1784,15 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
   function frame(now) {
     const dt = Math.min(0.033, (now - last) / 1000);
     last = now;
-    if (mode === 'play') { update(dt); if (mode === 'play') updateHud(); }
-    else if (mode === 'title') {
+    if (mode === 'play' && NET.role === 'client') { clientUpdate(dt); updateHud(); }
+    else if (mode === 'play') { update(dt); if (mode === 'play') updateHud(); }
+    else if (mode === 'title' || mode === 'lobby') {
       if (!G.demo || G.over || G.t > 90) { clearViews(); G = newMatch(5, true); }
       update(dt);
     }
     syncScene(dt);
     updateCamera(dt);
+    if (NET.role === 'host') hostTick(dt);
     if (mode === 'play') drawMinimap();
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
