@@ -47,11 +47,7 @@
 
 ## GitHub Pages での公開
 
-`.github/workflows/pages.yml` が、プッシュのたびに GitHub Pages へ自動で公開します。最初の1回だけ、リポジトリの設定が必要です。
-
-1. GitHub のリポジトリで **Settings → Pages** を開く
-2. **Build and deployment → Source** を **GitHub Actions** にする
-3. **Actions** タブで「GitHub Pages に公開」を実行する(または何かをプッシュする)
+**Settings → Pages** で **Deploy from a branch** を選び、ブランチ `ccr-8492ef95-yjtklb` の `/ (root)` から公開しています。プッシュすると数分で自動的に反映されます。
 
 公開先: https://shotaho.github.io/kaito_Wednesday/
 
