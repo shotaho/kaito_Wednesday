@@ -5,11 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>水曜日のカイト</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="頭のお皿のボールを道具で落とし合う3Dチームバトル。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
 <style>
-/* Layout: 校庭を見下ろす全画面キャンバス。上にスコア帯、左下に自分の状態、右上にミニマップ。単一テーマ(校庭の昼)。 */
+/* Layout: 校庭の3Dシーンを全画面に。上にスコア帯、右上にミニマップ、左下に自分の状態。単一テーマ(昼の校庭)。 */
 :root {
   --ink: #1f2a37;
   --paper: #fffaf0;
@@ -25,7 +26,7 @@
 [hidden] { display: none !important; }
 html, body { height: 100%; margin: 0; }
 body {
-  background: var(--sand);
+  background: #9fd3f5;
   color: var(--ink);
   font-family: var(--font-body);
   overflow: hidden;
@@ -33,7 +34,7 @@ body {
   touch-action: none;
 }
 #stage { position: relative; width: 100%; height: 100%; overflow: hidden; }
-canvas { display: block; width: 100%; height: 100%; }
+#game { display: block; width: 100%; height: 100%; }
 
 /* ---- HUD ---- */
 .topbar {
@@ -57,7 +58,15 @@ canvas { display: block; width: 100%; height: 100%; }
   font-family: var(--font-display); font-size: 20px;
   background: var(--paper); border: 2px solid var(--ink); border-radius: 8px; padding: 0 10px;
 }
-
+#mini {
+  position: absolute;
+  top: calc(52px + env(safe-area-inset-top, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  width: 180px; height: 120px; max-width: 32vw; max-height: 21.3vw;
+  border: 2px solid var(--ink); border-radius: 6px;
+  background: rgba(255, 250, 240, .85);
+  pointer-events: none;
+}
 .me {
   position: absolute;
   left: max(16px, env(safe-area-inset-left, 0px));
@@ -66,7 +75,7 @@ canvas { display: block; width: 100%; height: 100%; }
   border: 2px solid var(--ink); border-radius: 10px;
   padding: 8px 12px; display: grid; gap: 5px;
   font-size: 13px; font-weight: 800;
-  min-width: 190px; max-width: calc(100% - 32px); box-sizing: border-box;
+  width: 200px; max-width: calc(100% - 32px); box-sizing: border-box;
   font-variant-numeric: tabular-nums;
 }
 .me .row { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
@@ -81,33 +90,33 @@ canvas { display: block; width: 100%; height: 100%; }
 .summon.ready { background: var(--red); animation: pulse .8s ease-in-out infinite alternate; }
 @keyframes pulse { to { transform: scale(1.06); } }
 .hint { font-weight: 500; font-size: 11px; opacity: .7; }
-
 .log {
   position: absolute; left: max(16px, env(safe-area-inset-left, 0px));
   top: calc(52px + env(safe-area-inset-top, 0px));
-  display: grid; gap: 3px; pointer-events: none; max-width: 60%;
+  display: grid; gap: 3px; pointer-events: none; max-width: calc(100% - 230px);
 }
 .log div {
   font-size: 12px; font-weight: 800; color: var(--paper);
   background: rgba(31, 42, 55, .72); border-radius: 6px; padding: 2px 8px;
-  border-left: 4px solid var(--c, var(--paper));
-  justify-self: start;
+  border-left: 4px solid var(--c, var(--paper)); justify-self: start;
 }
 .banner {
-  position: absolute; left: 0; right: 0; top: 30%;
+  position: absolute; left: 0; right: 0; top: 28%;
   text-align: center; pointer-events: none;
-  font-family: var(--font-display); font-size: clamp(22px, 5vw, 38px);
-  color: var(--paper); -webkit-text-stroke: 1.5px var(--ink);
-  text-shadow: 0 3px 0 var(--ink);
+  font-family: var(--font-display); font-size: clamp(22px, 5vw, 40px);
+  color: var(--paper); -webkit-text-stroke: 1.5px var(--ink); text-shadow: 0 3px 0 var(--ink);
   padding-inline: 16px;
 }
 .jailmsg {
-  position: absolute; left: 50%; bottom: calc(110px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  position: absolute; left: 50%; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
   background: var(--ink); color: var(--paper); border-radius: 8px; padding: 6px 14px; font-weight: 800; font-size: 14px;
   width: max-content; max-width: calc(100% - 32px); text-align: center; pointer-events: none;
 }
-
-/* タッチ操作 */
+.lockhint {
+  position: absolute; left: 50%; top: calc(52px + env(safe-area-inset-top, 0px)); transform: translateX(-50%);
+  font-size: 12px; font-weight: 800; color: var(--paper); background: rgba(31, 42, 55, .6);
+  border-radius: 6px; padding: 2px 10px; pointer-events: none; white-space: nowrap;
+}
 .touch-btns {
   position: absolute;
   right: max(16px, env(safe-area-inset-right, 0px));
@@ -115,12 +124,10 @@ canvas { display: block; width: 100%; height: 100%; }
   display: flex; gap: 12px; align-items: end;
 }
 .tbtn {
-  width: 76px; height: 76px; border-radius: 50%;
-  border: 3px solid var(--ink); background: rgba(255, 250, 240, .85);
-  font-family: var(--font-display); font-size: 17px; color: var(--ink);
-  touch-action: none;
+  width: 84px; height: 84px; border-radius: 50%;
+  border: 3px solid var(--ink); background: rgba(255, 207, 58, .9);
+  font-family: var(--font-display); font-size: 17px; color: var(--ink); touch-action: none;
 }
-.tbtn.attack { background: rgba(255, 207, 58, .9); width: 88px; height: 88px; }
 
 /* ---- 画面カード ---- */
 .overlay {
@@ -131,7 +138,7 @@ canvas { display: block; width: 100%; height: 100%; }
   padding-block: 16px;
 }
 .card {
-  width: min(520px, 100%); max-height: 100%; overflow: auto; box-sizing: border-box;
+  width: min(540px, 100%); max-height: 100%; overflow: auto; box-sizing: border-box;
   background: var(--paper); border: 3px solid var(--ink); border-radius: 14px;
   box-shadow: 0 8px 0 var(--ink);
   padding: 22px; display: grid; gap: 14px;
@@ -157,11 +164,13 @@ kbd { font-family: var(--font-body); font-weight: 800; font-size: 11px; border: 
   box-shadow: 0 4px 0 var(--ink);
 }
 .start:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+.error { color: var(--red); font-weight: 800; }
 button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .summon.ready { animation: none; } }
-@media (max-width: 520px) {
-  .me { min-width: 0; width: 170px; padding: 6px 10px; gap: 3px; font-size: 12px; }
-  .log { max-width: calc(100% - 32px); }
+@media (max-width: 560px) {
+  .me { width: 168px; padding: 6px 10px; gap: 3px; font-size: 12px; }
+  .log { max-width: calc(100% - 32px); top: calc(130px + env(safe-area-inset-top, 0px)); }
+  .lockhint { display: none; }
 }
 </style>
 </head>
@@ -175,6 +184,8 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
       <div class="timer" id="timer">4:00</div>
       <div class="team red">赤組 <b id="redCount">5/5</b></div>
     </div>
+    <canvas id="mini" width="360" height="240"></canvas>
+    <div class="lockhint" id="lockhint">クリックで視点ロック(マウスで見回す / Esc で解除)</div>
     <div class="log" id="log"></div>
     <div class="banner" id="banner"></div>
     <div class="jailmsg" id="jailmsg" hidden>牢屋に入れられた!仲間がボールを届けてくれたら復活できる</div>
@@ -189,22 +200,23 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
       </div>
     </div>
     <div class="touch-btns" id="touchBtns" hidden>
-      <button class="tbtn attack" id="tAttack" type="button">攻撃</button>
+      <button class="tbtn" id="tAttack" type="button">攻撃</button>
     </div>
   </div>
 
   <div class="overlay" id="title">
     <div class="card">
-      <div class="eyebrow">TEAM PLATE BATTLE</div>
+      <div class="eyebrow">TEAM PLATE BATTLE 3D</div>
       <h1><span class="b">水曜日</span>の<span class="r">カイト</span></h1>
       <p>あなたは青組のカイト。頭のお皿にのったボールを、おもちゃの刀で落とし合うチーム戦です。</p>
       <dl class="rules">
         <dt>勝ち</dt><dd>相手チームを全員牢屋に入れる。時間切れなら残り人数(同じならお皿のボール数)で勝負</dd>
-        <dt>攻撃</dt><dd>道具でお皿をたたくとボールが1個落ちる。ほかの接触(体当たりなど)は禁止</dd>
+        <dt>攻撃</dt><dd>道具でお皿をたたくとボールが落ちる。ほかの接触(体当たりなど)は禁止</dd>
         <dt>牢屋</dt><dd>お皿のボールが0になると相手陣地の牢屋へ。ボールを持った仲間が牢屋の柵にさわると復活</dd>
-        <dt>武器</dt><dd>マップの箱や草むらにバット・物干し竿・ピコハンが隠れている。箱は攻撃で開く</dd>
+        <dt>武器</dt><dd>箱や草むらにバット・物干し竿・ピコハンが隠れている。箱は攻撃で開く</dd>
         <dt>召喚</dt><dd>拾ったボールを100個使うと、戦車・ヘリコプター・飛行機のどれかが来て相手を攻撃</dd>
-        <dt>操作</dt><dd><kbd>WASD</kbd>/<kbd>↑↓←→</kbd> 移動、<kbd>Space</kbd>/<kbd>J</kbd>/クリック 攻撃、<kbd>Q</kbd> 召喚。スマホは左側ドラッグで移動</dd>
+        <dt>PC</dt><dd><kbd>WASD</kbd> 移動、マウス(クリックでロック)か <kbd>←</kbd><kbd>→</kbd> で視点、クリック/<kbd>Space</kbd> 攻撃、<kbd>Q</kbd> 召喚</dd>
+        <dt>スマホ</dt><dd>左側ドラッグで移動、右側ドラッグで視点、右側タップか攻撃ボタンで攻撃</dd>
       </dl>
       <div class="opts" role="radiogroup" aria-label="人数">
         <span>人数</span>
@@ -212,6 +224,7 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
         <label><input type="radio" name="size" id="size5" value="5" checked> 5対5</label>
         <label><input type="radio" name="size" id="size8" value="8"> 8対8</label>
       </div>
+      <p class="error" id="loadError" hidden>3D表示の読み込みに失敗しました。ネット接続を確認して、ページを再読み込みしてください。</p>
       <button class="start" id="startBtn" type="button">バトル開始</button>
     </div>
   </div>
@@ -227,27 +240,30 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (() => {
   'use strict';
+  if (!window.THREE) { document.getElementById('loadError').hidden = false; document.getElementById('startBtn').disabled = true; return; }
 
   // ================= 設定 =================
-  const MAP_W = 2400, MAP_H = 1600;
-  const PLATE_MAX = 3;          // お皿にのるボール数
-  const VEHICLE_COST = 100;     // 召喚に必要なボール
-  const MATCH_TIME = 240;       // 試合時間(秒)
+  const MAP_W = 2400, MAP_H = 1600;   // ロジック座標(1 = 2.5cm)
+  const S = 0.025;                    // ロジック座標 → メートル
+  const PLATE_MAX = 3;
+  const VEHICLE_COST = 100;
+  const MATCH_TIME = 240;
   const PLAYER_R = 18;
 
   const WEAPONS = {
-    sword:  { name: 'おもちゃの刀', range: 50, arc: 1.7, cd: 0.45, knock: 1, len: 34, color: '#c9d2dc' },
-    bat:    { name: 'バット',       range: 58, arc: 2.0, cd: 0.70, knock: 2, len: 40, color: '#b07a3e' },
-    pole:   { name: '物干し竿',     range: 92, arc: 0.7, cd: 0.65, knock: 1, len: 78, color: '#7fb8d8' },
-    hammer: { name: 'ピコハン',     range: 46, arc: 2.3, cd: 0.25, knock: 1, len: 30, color: '#ff7aa8' },
+    sword:  { name: 'おもちゃの刀', range: 50, arc: 1.7, cd: 0.45, knock: 1, len: 34 },
+    bat:    { name: 'バット',       range: 58, arc: 2.0, cd: 0.70, knock: 2, len: 40 },
+    pole:   { name: '物干し竿',     range: 92, arc: 0.7, cd: 0.65, knock: 1, len: 78 },
+    hammer: { name: 'ピコハン',     range: 46, arc: 2.3, cd: 0.25, knock: 1, len: 30 },
   };
   const VEHICLES = { tank: '戦車', heli: 'ヘリコプター', plane: '飛行機' };
   const TEAM = [
-    { name: '青組', color: '#2f6fd6', dark: '#1d4c9c', tint: 'rgba(47,111,214,.10)' },
-    { name: '赤組', color: '#e0483a', dark: '#a52b20', tint: 'rgba(224,72,58,.10)' },
+    { name: '青組', color: '#2f6fd6', dark: '#1d4c9c' },
+    { name: '赤組', color: '#e0483a', dark: '#a52b20' },
   ];
   const NAMES = [
     ['カイト', 'ソウタ', 'ハル', 'ミオ', 'リク', 'ユイ', 'ケン', 'アオイ'],
@@ -255,7 +271,6 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
   ];
 
   // ================= マップ =================
-  // jails[t] はチーム t が持つ牢屋(=相手チームの選手が入る)
   const jails = [
     { x: 60, y: 60, w: 250, h: 210, exitX: 360, exitY: 165 },
     { x: MAP_W - 310, y: MAP_H - 270, w: 250, h: 210, exitX: MAP_W - 360, exitY: MAP_H - 165 },
@@ -277,20 +292,49 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     [640, 1450, 55], [1760, 150, 55],
   ].map(([x, y, r]) => ({ x, y, r }));
 
-  // ================= DOM / キャンバス =================
+  // ================= 便利関数 =================
   const $ = (id) => document.getElementById(id);
-  const cv = $('game'), ctx = cv.getContext('2d');
-  let W = 0, H = 0, DPR = 1, zoom = 1;
-  function resize() {
-    const r = cv.getBoundingClientRect();
-    DPR = Math.min(2, window.devicePixelRatio || 1);
-    W = r.width; H = r.height;
-    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
-    zoom = Math.max(0.5, Math.min(1.15, Math.min(W / 1000, H / 680)));
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const pick = (a) => a[Math.floor(Math.random() * a.length)];
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return Math.abs(d); };
+  const inRect = (x, y, r, pad = 0) => x > r.x - pad && x < r.x + r.w + pad && y > r.y - pad && y < r.y + r.h + pad;
+  const distToRect = (p, r) => Math.hypot(p.x - clamp(p.x, r.x, r.x + r.w), p.y - clamp(p.y, r.y, r.y + r.h));
+  const wx = (x) => (x - MAP_W / 2) * S;
+  const wz = (y) => (y - MAP_H / 2) * S;
+
+  function pushOutRect(o, rad, r) {
+    const cx = clamp(o.x, r.x, r.x + r.w), cy = clamp(o.y, r.y, r.y + r.h);
+    const dx = o.x - cx, dy = o.y - cy, d = Math.hypot(dx, dy);
+    if (d >= rad) return;
+    if (d === 0) {
+      const l = o.x - r.x, rr = r.x + r.w - o.x, t = o.y - r.y, b = r.y + r.h - o.y, m = Math.min(l, rr, t, b);
+      if (m === l) o.x = r.x - rad; else if (m === rr) o.x = r.x + r.w + rad; else if (m === t) o.y = r.y - rad; else o.y = r.y + r.h + rad;
+    } else { o.x += dx / d * (rad - d); o.y += dy / d * (rad - d); }
   }
-  window.addEventListener('resize', resize);
-  resize();
-  const coarse = window.matchMedia('(pointer: coarse)').matches;
+  function pushOutCircle(o, rad, c) {
+    const dx = o.x - c.x, dy = o.y - c.y, d = Math.hypot(dx, dy) || 0.01, m = rad + c.r;
+    if (d < m) { o.x = c.x + dx / d * m; o.y = c.y + dy / d * m; }
+  }
+  function resolveWorld(o, rad) {
+    o.x = clamp(o.x, rad, MAP_W - rad); o.y = clamp(o.y, rad, MAP_H - rad);
+    for (const w of walls) pushOutRect(o, rad, w);
+    for (const t of trees) pushOutCircle(o, rad, t);
+    for (const j of jails) pushOutRect(o, rad, j);
+  }
+  function blocked(x, y, rad) {
+    if (x < rad || y < rad || x > MAP_W - rad || y > MAP_H - rad) return true;
+    if (walls.some((w) => inRect(x, y, w, rad)) || jails.some((j) => inRect(x, y, j, rad + 20))) return true;
+    return trees.some((t) => Math.hypot(x - t.x, y - t.y) < t.r + rad);
+  }
+  function freeSpot(rad) {
+    for (let i = 0; i < 40; i++) {
+      const x = rnd(80, MAP_W - 80), y = rnd(80, MAP_H - 80);
+      if (!blocked(x, y, rad)) return { x, y };
+    }
+    return { x: MAP_W / 2, y: MAP_H / 2 - 200 };
+  }
 
   // ================= 音 =================
   let actx = null;
@@ -316,48 +360,6 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     open: () => beep(700, 0.12, 'triangle', 0.06, 400),
   };
 
-  // ================= 便利関数 =================
-  const rnd = (a, b) => a + Math.random() * (b - a);
-  const pick = (a) => a[Math.floor(Math.random() * a.length)];
-  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-  const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return Math.abs(d); };
-  const inRect = (x, y, r, pad = 0) => x > r.x - pad && x < r.x + r.w + pad && y > r.y - pad && y < r.y + r.h + pad;
-  const distToRect = (p, r) => Math.hypot(p.x - clamp(p.x, r.x, r.x + r.w), p.y - clamp(p.y, r.y, r.y + r.h));
-
-  function pushOutRect(o, rad, r) {
-    const cx = clamp(o.x, r.x, r.x + r.w), cy = clamp(o.y, r.y, r.y + r.h);
-    let dx = o.x - cx, dy = o.y - cy; const d = Math.hypot(dx, dy);
-    if (d >= rad) return;
-    if (d === 0) {
-      const l = o.x - r.x, rr = r.x + r.w - o.x, t = o.y - r.y, b = r.y + r.h - o.y, m = Math.min(l, rr, t, b);
-      if (m === l) o.x = r.x - rad; else if (m === rr) o.x = r.x + r.w + rad; else if (m === t) o.y = r.y - rad; else o.y = r.y + r.h + rad;
-    } else { o.x += dx / d * (rad - d); o.y += dy / d * (rad - d); }
-  }
-  function pushOutCircle(o, rad, c) {
-    const dx = o.x - c.x, dy = o.y - c.y, d = Math.hypot(dx, dy) || 0.01, m = rad + c.r;
-    if (d < m) { o.x = c.x + dx / d * m; o.y = c.y + dy / d * m; }
-  }
-  function resolveWorld(o, rad, opts = {}) {
-    o.x = clamp(o.x, rad, MAP_W - rad); o.y = clamp(o.y, rad, MAP_H - rad);
-    for (const w of walls) pushOutRect(o, rad, w);
-    for (const t of trees) pushOutCircle(o, rad, t);
-    if (!opts.ignoreJails) for (const j of jails) pushOutRect(o, rad, j);
-  }
-  function blocked(x, y, rad) {
-    if (x < rad || y < rad || x > MAP_W - rad || y > MAP_H - rad) return true;
-    if (walls.some((w) => inRect(x, y, w, rad)) || jails.some((j) => inRect(x, y, j, rad + 20))) return true;
-    return trees.some((t) => Math.hypot(x - t.x, y - t.y) < t.r + rad);
-  }
-  function freeSpot(rad, area) {
-    for (let i = 0; i < 40; i++) {
-      const x = area ? rnd(area.x, area.x + area.w) : rnd(80, MAP_W - 80);
-      const y = area ? rnd(area.y, area.y + area.h) : rnd(80, MAP_H - 80);
-      if (!blocked(x, y, rad)) return { x, y };
-    }
-    return { x: MAP_W / 2, y: MAP_H / 2 - 200 };
-  }
-
   // ================= 状態 =================
   let mode = 'title';
   let G = null;
@@ -366,13 +368,14 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     const players = [];
     for (let t = 0; t < 2; t++) {
       for (let i = 0; i < size; i++) {
+        const isHuman = !demo && t === 0 && i === 0;
         const x = t === 0 ? 180 + (i % 2) * 90 : MAP_W - 180 - (i % 2) * 90;
         const y = MAP_H / 2 + (i - (size - 1) / 2) * Math.min(110, 900 / size);
         players.push({
-          id: players.length, team: t, name: NAMES[t][i], human: !demo && t === 0 && i === 0,
+          id: players.length, team: t, name: NAMES[t][i], human: isHuman,
           x, y, face: t === 0 ? 0 : Math.PI, plate: PLATE_MAX, carry: 0, weapon: 'sword',
           swingT: 0, cd: 0, inv: 0, jailed: false, rescueCd: 0, step: Math.random() * 6,
-          speed: !demo && t === 0 && i === 0 ? 215 : rnd(170, 200),
+          speed: isHuman ? 215 : rnd(170, 200),
           ai: { role: pick(['attack', 'attack', 'rescue', 'collect']), think: Math.random() * 0.3, goal: null, mode: '', target: null, lastX: x, lastY: y, stuckT: 0, unstuck: 0, uDir: 0 },
           stats: { knocks: 0, rescues: 0, picked: 0, summons: 0 },
         });
@@ -380,65 +383,17 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     }
     const contents = ['bat', 'bat', 'bat', 'pole', 'pole', 'hammer', 'hammer', 'balls', 'balls', 'empty'];
     const boxes = bushes.map((b, i) => ({ x: b.x + rnd(-15, 15), y: b.y + rnd(-15, 15), open: false, content: contents[i % contents.length], respawn: 0 }));
-    shuffleContents(boxes);
+    for (let i = boxes.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [boxes[i].content, boxes[j].content] = [boxes[j].content, boxes[i].content]; }
     boxes.push({ x: 1110, y: 800, open: false, content: 'bat', respawn: 0 }, { x: 1290, y: 800, open: false, content: 'pole', respawn: 0 });
     const g = {
       t: 0, size, demo, players, boxes, piles: [], items: [], projectiles: [], bombs: [], vehicles: [], parts: [], floaters: [],
-      spawnT: 0, cam: { x: 0, y: 0 }, banner: { text: '', t: 0 }, over: false,
+      spawnT: 0, banner: { text: '', t: 0 }, over: false,
     };
     for (let i = 0; i < 14; i++) { const s = freeSpot(10); g.piles.push({ x: s.x, y: s.y, n: Math.ceil(rnd(2, 7)), z: 0, vx: 0, vy: 0, vz: 0, age: 9 }); }
     return g;
   }
-  function shuffleContents(boxes) {
-    for (let i = boxes.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [boxes[i].content, boxes[j].content] = [boxes[j].content, boxes[i].content]; }
-  }
   const human = () => G.players.find((p) => p.human) || G.players[0];
   const active = (t) => G.players.filter((p) => p.team === t && !p.jailed);
-
-  // ================= 入力 =================
-  const keys = {};
-  const input = { mx: 0, my: 0, attack: false, aim: null };
-  window.addEventListener('keydown', (e) => {
-    keys[e.key.toLowerCase()] = true;
-    if (mode === 'play') {
-      if ([' ', 'j'].includes(e.key.toLowerCase())) { input.attack = true; e.preventDefault(); }
-      if (['q', 'k'].includes(e.key.toLowerCase())) tryHumanSummon();
-      if (e.key.startsWith('Arrow')) e.preventDefault();
-    }
-  });
-  window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
-  window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
-
-  // タッチ:左半分ドラッグでスティック、右半分タップで攻撃。マウス:クリックで攻撃(その方向へ)
-  const joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
-  cv.addEventListener('pointerdown', (e) => {
-    if (mode !== 'play') return;
-    if (e.pointerType === 'touch') {
-      if (e.clientX < W * 0.5 && joy.id === null) { joy.id = e.pointerId; joy.ox = joy.x = e.clientX; joy.oy = joy.y = e.clientY; }
-      else input.attack = true;
-    } else {
-      const r = cv.getBoundingClientRect();
-      input.aim = { x: G.cam.x + (e.clientX - r.left) / zoom, y: G.cam.y + (e.clientY - r.top) / zoom };
-      input.attack = true;
-    }
-  });
-  cv.addEventListener('pointermove', (e) => { if (e.pointerId === joy.id) { joy.x = e.clientX; joy.y = e.clientY; } });
-  const joyEnd = (e) => { if (e.pointerId === joy.id) joy.id = null; };
-  cv.addEventListener('pointerup', joyEnd); cv.addEventListener('pointercancel', joyEnd);
-  $('tAttack').addEventListener('pointerdown', (e) => { e.preventDefault(); input.attack = true; });
-  $('summonBtn').addEventListener('click', () => { tryHumanSummon(); $('summonBtn').blur(); });
-
-  function readMove() {
-    let x = (keys['d'] || keys['arrowright'] ? 1 : 0) - (keys['a'] || keys['arrowleft'] ? 1 : 0);
-    let y = (keys['s'] || keys['arrowdown'] ? 1 : 0) - (keys['w'] || keys['arrowup'] ? 1 : 0);
-    if (joy.id !== null) {
-      const dx = joy.x - joy.ox, dy = joy.y - joy.oy, d = Math.hypot(dx, dy);
-      if (d > 8) { x = dx / Math.max(d, 50); y = dy / Math.max(d, 50); }
-    }
-    const m = Math.hypot(x, y);
-    if (m > 1) { x /= m; y /= m; }
-    input.mx = x; input.my = y;
-  }
 
   // ================= ゲームの出来事 =================
   function log(text, team) {
@@ -451,11 +406,11 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     setTimeout(() => el.remove(), 5000);
   }
   function banner(text) { G.banner = { text, t: 2.6 }; }
-  function floater(x, y, text, color = '#1f2a37') { G.floaters.push({ x, y, text, color, t: 1 }); }
-  function burst(x, y, color, n = 10, spd = 160) {
-    for (let i = 0; i < n; i++) {
+  function floater(x, y, text, color = '#1f2a37') { if (G.floaters.length < 30) G.floaters.push({ x, y, h: 2.3, text, color, t: 1 }); }
+  function burst(x, y, color, n = 10, spd = 160, h = 1) {
+    for (let i = 0; i < n && G.parts.length < 380; i++) {
       const a = Math.random() * Math.PI * 2, s = rnd(0.3, 1) * spd;
-      G.parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rnd(0.3, 0.7), color });
+      G.parts.push({ x, y, h, vx: Math.cos(a) * s, vy: Math.sin(a) * s, vh: rnd(1.5, 5), life: rnd(0.4, 0.8), color });
     }
   }
   const audible = (x, y) => { const h = human(); return Math.hypot(h.x - x, h.y - y) < 700; };
@@ -463,10 +418,9 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
   function knockBalls(e, n) {
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2, s = rnd(80, 170);
-      G.piles.push({ x: e.x, y: e.y, n: 1, z: 18, vx: Math.cos(a) * s, vy: Math.sin(a) * s, vz: rnd(120, 200), age: 0 });
+      G.piles.push({ x: e.x, y: e.y, n: 1, z: 70, vx: Math.cos(a) * s, vy: Math.sin(a) * s, vz: rnd(150, 250), age: 0 });
     }
   }
-
   function hitPlayer(e, knock, attacker, srcX, srcY) {
     if (e.jailed || e.inv > 0) return false;
     const lost = Math.min(knock, e.plate);
@@ -474,26 +428,23 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     knockBalls(e, lost);
     const a = Math.atan2(e.y - srcY, e.x - srcX);
     e.x += Math.cos(a) * 14; e.y += Math.sin(a) * 14;
-    floater(e.x, e.y - 40, `-${lost}`, TEAM[e.team].color);
-    burst(e.x, e.y - 10, '#ffcf3a', 6, 120);
+    floater(e.x, e.y, `-${lost}`, TEAM[e.team].color);
+    burst(e.x, e.y, '#ffcf3a', 6, 120, 1.7);
     if (attacker) attacker.stats.knocks += lost;
     if (audible(e.x, e.y)) sfx.hit();
     if (e.plate <= 0) sendToJail(e, attacker);
     return true;
   }
-
   function sendToJail(e, by) {
     e.jailed = true; e.plate = 0; e.inv = 0;
-    // 持っていたボールはその場にこぼれる
     let c = e.carry; e.carry = 0;
-    while (c > 0) { const n = Math.min(c, 6); c -= n; G.piles.push({ x: e.x + rnd(-30, 30), y: e.y + rnd(-30, 30), n, z: 10, vx: rnd(-60, 60), vy: rnd(-60, 60), vz: 100, age: 0 }); }
+    while (c > 0) { const n = Math.min(c, 6); c -= n; G.piles.push({ x: e.x + rnd(-30, 30), y: e.y + rnd(-30, 30), n, z: 30, vx: rnd(-60, 60), vy: rnd(-60, 60), vz: 100, age: 0 }); }
     const j = jails[1 - e.team];
     e.x = rnd(j.x + 30, j.x + j.w - 30); e.y = rnd(j.y + 30, j.y + j.h - 30);
     log(`${e.name}(${TEAM[e.team].name})が牢屋へ${by ? `  ← ${by.name}` : ''}`, 1 - e.team);
     if (e.human || audible(e.x, e.y)) sfx.jail();
     checkWin();
   }
-
   function rescue(p, prisoner) {
     p.carry -= 1; p.rescueCd = 0.6; p.stats.rescues++;
     const j = jails[1 - p.team];
@@ -504,7 +455,6 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     log(`${p.name}が${prisoner.name}を助けた!`, p.team);
     if (p.human || prisoner.human || audible(p.x, p.y)) sfx.rescue();
   }
-
   function swing(p) {
     const W_ = WEAPONS[p.weapon];
     if (p.cd > 0 || p.jailed) return;
@@ -512,26 +462,21 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     if (p.human) sfx.swing();
     for (const e of G.players) {
       if (e.team === p.team || e.jailed) continue;
-      const d = dist(p, e);
-      if (d <= W_.range + PLAYER_R && angDiff(Math.atan2(e.y - p.y, e.x - p.x), p.face) <= W_.arc / 2 + 0.25) {
-        hitPlayer(e, W_.knock, p, p.x, p.y);
-      }
+      if (dist(p, e) <= W_.range + PLAYER_R && angDiff(Math.atan2(e.y - p.y, e.x - p.x), p.face) <= W_.arc / 2 + 0.25) hitPlayer(e, W_.knock, p, p.x, p.y);
     }
     for (const b of G.boxes) {
       if (b.open) continue;
-      if (Math.hypot(b.x - p.x, b.y - p.y) <= W_.range + 18 && angDiff(Math.atan2(b.y - p.y, b.x - p.x), p.face) <= W_.arc / 2 + 0.4) openBox(b, p);
+      if (Math.hypot(b.x - p.x, b.y - p.y) <= W_.range + 18 && angDiff(Math.atan2(b.y - p.y, b.x - p.x), p.face) <= W_.arc / 2 + 0.4) openBox(b);
     }
   }
-
-  function openBox(b, p) {
+  function openBox(b) {
     b.open = true; b.respawn = 35;
-    burst(b.x, b.y, '#c49a5c', 12, 150);
+    burst(b.x, b.y, '#c49a5c', 12, 150, 0.5);
     if (audible(b.x, b.y)) sfx.open();
-    if (b.content === 'balls') { G.piles.push({ x: b.x, y: b.y, n: 15, z: 14, vx: 0, vy: 0, vz: 120, age: 0 }); floater(b.x, b.y - 20, 'ボール×15'); }
-    else if (b.content === 'empty') floater(b.x, b.y - 20, 'からっぽ');
-    else { G.items.push({ x: b.x, y: b.y, type: b.content }); floater(b.x, b.y - 20, WEAPONS[b.content].name + '!'); }
+    if (b.content === 'balls') { G.piles.push({ x: b.x, y: b.y, n: 15, z: 20, vx: 0, vy: 0, vz: 160, age: 0 }); floater(b.x, b.y, 'ボール×15'); }
+    else if (b.content === 'empty') floater(b.x, b.y, 'からっぽ');
+    else { G.items.push({ x: b.x, y: b.y, type: b.content }); floater(b.x, b.y, WEAPONS[b.content].name + '!'); }
   }
-
   function summon(p) {
     if (p.carry < VEHICLE_COST || p.jailed) return;
     p.carry -= VEHICLE_COST; p.stats.summons++;
@@ -539,7 +484,7 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     const t = p.team;
     if (type === 'tank') G.vehicles.push({ type, team: t, x: p.x, y: p.y, ang: p.face, t: 11, fire: 0.8, owner: p });
     if (type === 'heli') G.vehicles.push({ type, team: t, x: t === 0 ? -100 : MAP_W + 100, y: MAP_H / 2, ang: 0, t: 11, drop: 1, rotor: 0, owner: p });
-    if (type === 'plane') G.vehicles.push({ type, team: t, x: 0, y: 0, dir: 1, passes: 3, acc: 0, owner: p, started: false });
+    if (type === 'plane') G.vehicles.push({ type, team: t, x: 0, y: 0, dir: 1, passes: 3, acc: 0, owner: p, started: false, t: 99 });
     banner(`${TEAM[t].name} ${VEHICLES[type]} 出動!`);
     log(`${p.name}がボール100個で${VEHICLES[type]}を呼んだ`, t);
     sfx.summon();
@@ -548,14 +493,14 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
 
   function checkWin() {
     if (G.over) return;
-    const a0 = active(0).length, a1 = active(1).length;
-    if (a0 === 0) endMatch(1, '青組が全員牢屋に入った');
-    else if (a1 === 0) endMatch(0, '赤組を全員牢屋に入れた');
+    if (active(0).length === 0) endMatch(1, '青組が全員牢屋に入った');
+    else if (active(1).length === 0) endMatch(0, '赤組を全員牢屋に入れた');
   }
   function endMatch(winner, reason) {
     G.over = true;
     if (G.demo) return;
     mode = 'result';
+    releaseLock();
     const h = human();
     $('resEyebrow').textContent = winner === null ? 'DRAW' : winner === 0 ? 'YOU WIN' : 'YOU LOSE';
     $('resTitle').textContent = winner === null ? '引き分け' : `${TEAM[winner].name}の勝ち!`;
@@ -585,7 +530,6 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     const dE = e ? dist(p, e) : Infinity;
     const jail = jails[1 - p.team];
     let goal = null, m = 'wander', target = null;
-
     if (p.carry >= 1 && prisoners.length && (ai.role === 'rescue' || prisoners.length >= 2 || dE > 320)) {
       goal = { x: clamp(p.x, jail.x - 30, jail.x + jail.w + 30), y: clamp(p.y, jail.y - 30, jail.y + jail.h + 30) };
       if (inRect(goal.x, goal.y, jail)) goal = { x: jail.exitX, y: jail.exitY };
@@ -606,17 +550,14 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     }
     ai.goal = { x: goal.x, y: goal.y }; ai.mode = m; ai.target = target;
   }
-
   function botMove(p, dt) {
     const ai = p.ai;
     if (p.jailed) {
-      // 牢屋では出口側の柵にくっついて待つ
       const j = jails[1 - p.team];
-      return { x: Math.sign(j.exitX - p.x) * 0.3, y: Math.sign(j.exitY - p.y) * 0.3 * (Math.abs(j.exitY - p.y) > 20 ? 1 : 0) };
+      return { x: Math.sign(j.exitX - p.x) * 0.3, y: Math.abs(j.exitY - p.y) > 20 ? Math.sign(j.exitY - p.y) * 0.3 : 0 };
     }
     ai.think -= dt;
     if (ai.think <= 0) { think(p); ai.think = rnd(0.2, 0.4); }
-    // 詰まり対策
     ai.stuckT += dt;
     if (ai.stuckT > 0.8) {
       if (Math.hypot(p.x - ai.lastX, p.y - ai.lastY) < 12 && ai.mode !== 'fight') { ai.unstuck = 0.6; ai.uDir = rnd(0, Math.PI * 2); }
@@ -625,20 +566,92 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     if (ai.unstuck > 0) { ai.unstuck -= dt; return { x: Math.cos(ai.uDir), y: Math.sin(ai.uDir) }; }
     if (!ai.goal) return { x: 0, y: 0 };
     let tx = ai.goal.x, ty = ai.goal.y;
-    if (ai.target && !ai.target.jailed && ai.target.x !== undefined) { tx = ai.target.x; ty = ai.target.y; }
+    if (ai.target && !ai.target.jailed) { tx = ai.target.x; ty = ai.target.y; }
     const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy);
-    const stopAt = ai.mode === 'fight' ? WEAPONS[p.weapon].range * 0.75 : ai.mode === 'box' ? 40 : 4;
-    // 攻撃
     const W_ = WEAPONS[p.weapon];
+    const stopAt = ai.mode === 'fight' ? W_.range * 0.75 : ai.mode === 'box' ? 40 : 4;
     const foe = nearestOf(p, active(1 - p.team), W_.range + PLAYER_R);
     if (foe && p.cd <= 0 && Math.random() < dt * 7) { p.face = Math.atan2(foe.y - p.y, foe.x - p.x); swing(p); }
     else if (ai.mode === 'box' && ai.target && !ai.target.open && d < W_.range + 10 && p.cd <= 0) { p.face = Math.atan2(dy, dx); swing(p); }
     if (d <= stopAt) {
-      // 間合いで左右にゆれる
       if (ai.mode === 'fight') { const a = Math.atan2(dy, dx) + Math.PI / 2; const s = Math.sin(G.t * 3 + p.id) * 0.6; return { x: Math.cos(a) * s, y: Math.sin(a) * s }; }
       return { x: 0, y: 0 };
     }
     return { x: dx / d, y: dy / d };
+  }
+
+  // ================= 入力 =================
+  const keys = {};
+  const cam = { yaw: 0, pitch: 0.55, dist: 9 };
+  const input = { attack: false };
+  const coarse = window.matchMedia('(pointer: coarse)').matches;
+  const cv = $('game');
+
+  window.addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    keys[k] = true;
+    if (mode === 'play') {
+      if (k === ' ' || k === 'j') { input.attack = true; e.preventDefault(); }
+      if (k === 'q' || k === 'k') tryHumanSummon();
+      if (k.startsWith('arrow')) e.preventDefault();
+    }
+  });
+  window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+  window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+
+  const locked = () => document.pointerLockElement === cv;
+  function releaseLock() { try { if (locked()) document.exitPointerLock(); } catch {} }
+  document.addEventListener('pointerlockchange', () => { $('lockhint').hidden = locked() || coarse; });
+
+  const joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
+  const look = { id: null, x: 0, y: 0, sx: 0, sy: 0, t: 0 };
+  const mouseDrag = { on: false, x: 0, y: 0 };
+  cv.addEventListener('pointerdown', (e) => {
+    if (mode !== 'play') return;
+    if (e.pointerType === 'touch') {
+      if (e.clientX < innerWidth * 0.45 && joy.id === null) { joy.id = e.pointerId; joy.ox = joy.x = e.clientX; joy.oy = joy.y = e.clientY; }
+      else if (look.id === null) { look.id = e.pointerId; look.x = look.sx = e.clientX; look.y = look.sy = e.clientY; look.t = performance.now(); }
+    } else {
+      if (!locked()) { try { const r = cv.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch {} mouseDrag.on = true; mouseDrag.x = e.clientX; mouseDrag.y = e.clientY; }
+      if (e.button === 0) input.attack = true;
+    }
+  });
+  cv.addEventListener('pointermove', (e) => {
+    if (e.pointerId === joy.id) { joy.x = e.clientX; joy.y = e.clientY; return; }
+    if (e.pointerId === look.id) { turn(e.clientX - look.x, e.clientY - look.y, 0.006); look.x = e.clientX; look.y = e.clientY; return; }
+    if (e.pointerType === 'mouse') {
+      if (locked()) turn(e.movementX, e.movementY, 0.0026);
+      else if (mouseDrag.on) { turn(e.clientX - mouseDrag.x, e.clientY - mouseDrag.y, 0.005); mouseDrag.x = e.clientX; mouseDrag.y = e.clientY; }
+    }
+  });
+  const endPointer = (e) => {
+    if (e.pointerId === joy.id) joy.id = null;
+    if (e.pointerId === look.id) {
+      if (performance.now() - look.t < 250 && Math.hypot(e.clientX - look.sx, e.clientY - look.sy) < 12) input.attack = true;
+      look.id = null;
+    }
+    if (e.pointerType === 'mouse') mouseDrag.on = false;
+  };
+  cv.addEventListener('pointerup', endPointer); cv.addEventListener('pointercancel', endPointer);
+  function turn(dx, dy, k) { cam.yaw += dx * k; cam.pitch = clamp(cam.pitch + dy * k * 0.8, 0.18, 1.25); }
+
+  $('tAttack').addEventListener('pointerdown', (e) => { e.preventDefault(); input.attack = true; });
+  $('summonBtn').addEventListener('click', () => { tryHumanSummon(); $('summonBtn').blur(); });
+
+  function readMove(dt) {
+    if (keys['arrowleft']) cam.yaw -= 2 * dt;
+    if (keys['arrowright']) cam.yaw += 2 * dt;
+    let f = (keys['w'] || keys['arrowup'] ? 1 : 0) - (keys['s'] || keys['arrowdown'] ? 1 : 0);
+    let s = (keys['d'] ? 1 : 0) - (keys['a'] ? 1 : 0);
+    if (joy.id !== null) {
+      const dx = joy.x - joy.ox, dy = joy.y - joy.oy, d = Math.hypot(dx, dy);
+      if (d > 8) { s = dx / Math.max(d, 50); f = -dy / Math.max(d, 50); }
+    }
+    const fx = Math.cos(cam.yaw), fy = Math.sin(cam.yaw);
+    let x = fx * f - fy * s, y = fy * f + fx * s;
+    const m = Math.hypot(x, y);
+    if (m > 1) { x /= m; y /= m; }
+    return { x, y };
   }
 
   // ================= 更新 =================
@@ -652,36 +665,35 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
         endMatch(b0 === b1 ? null : b0 > b1 ? 0 : 1, `時間切れ。残り人数が同じ ${a0} 人で、お皿のボールは ${b0} 対 ${b1}`);
       }
     }
+    const humanMove = G.demo ? null : readMove(dt);
 
-    // プレイヤー
-    readMove();
     for (const p of G.players) {
       p.cd = Math.max(0, p.cd - dt); p.inv = Math.max(0, p.inv - dt); p.swingT = Math.max(0, p.swingT - dt); p.rescueCd = Math.max(0, p.rescueCd - dt);
       let mv;
       if (p.human) {
-        mv = { x: input.mx, y: input.my };
-        if (input.attack) {
-          if (input.aim) p.face = Math.atan2(input.aim.y - p.y, input.aim.x - p.x);
-          else {
-            // 近くの相手(なければ箱)へ自動で向く
-            const foe = nearestOf(p, active(1 - p.team), WEAPONS[p.weapon].range + 60);
-            const box = foe ? null : nearestOf(p, G.boxes.filter((b) => !b.open), WEAPONS[p.weapon].range + 40);
-            const t = foe || box; if (t) p.face = Math.atan2(t.y - p.y, t.x - p.x);
-          }
+        mv = humanMove;
+        if (input.attack && !p.jailed) {
+          // 視点の前方にいる相手(いなければ箱)へ自動で向く
+          const W_ = WEAPONS[p.weapon];
+          const inFront = (o) => angDiff(Math.atan2(o.y - p.y, o.x - p.x), cam.yaw) < 1.9;
+          const foe = nearestOf(p, active(1 - p.team).filter(inFront), W_.range + 70);
+          const box = foe ? null : nearestOf(p, G.boxes.filter((b) => !b.open && inFront(b)), W_.range + 50);
+          const t = foe || box;
+          p.face = t ? Math.atan2(t.y - p.y, t.x - p.x) : cam.yaw;
           swing(p);
         }
       } else mv = botMove(p, dt);
       const m = Math.hypot(mv.x, mv.y);
       if (m > 0.05) {
         p.x += mv.x * p.speed * dt; p.y += mv.y * p.speed * dt; p.step += dt * 12 * m;
-        if (p.swingT <= 0 && !(p.human && input.attack)) p.face = Math.atan2(mv.y, mv.x);
+        if (p.swingT <= 0) p.face = Math.atan2(mv.y, mv.x);
       }
       if (p.jailed) {
         const j = jails[1 - p.team];
         p.x = clamp(p.x, j.x + PLAYER_R + 6, j.x + j.w - PLAYER_R - 6); p.y = clamp(p.y, j.y + PLAYER_R + 6, j.y + j.h - PLAYER_R - 6);
       } else resolveWorld(p, PLAYER_R);
     }
-    input.attack = false; input.aim = null;
+    input.attack = false;
 
     // 体どうしは押し返すだけ(接触による攻撃はなし)
     for (let i = 0; i < G.players.length; i++) for (let k = i + 1; k < G.players.length; k++) {
@@ -691,11 +703,10 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
       if (d < m) { const push = (m - d) / 2; a.x -= dx / d * push; a.y -= dy / d * push; b.x += dx / d * push; b.y += dy / d * push; }
     }
 
-    // ボールを拾う・武器を拾う・仲間を助ける
     for (const p of G.players) {
       if (p.jailed) continue;
       for (const pl of G.piles) {
-        if (pl.age > 0.35 && pl.n > 0 && Math.hypot(pl.x - p.x, pl.y - p.y) < PLAYER_R + 12) {
+        if (pl.age > 0.35 && pl.n > 0 && pl.z <= 0 && Math.hypot(pl.x - p.x, pl.y - p.y) < PLAYER_R + 12) {
           p.carry += pl.n; p.stats.picked += pl.n; pl.n = 0;
           if (p.human) sfx.pick();
         }
@@ -704,10 +715,9 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
         if (it.taken || it.type === p.weapon || (it.noPick === p.id && it.noT > 0)) continue;
         if (!p.human && p.weapon !== 'sword') continue;
         if (Math.hypot(it.x - p.x, it.y - p.y) < PLAYER_R + 16) {
-          // 持っていた武器(刀以外)はその場に置いていく
           if (p.weapon !== 'sword') G.items.push({ x: p.x, y: p.y, type: p.weapon, noPick: p.id, noT: 1.5 });
           p.weapon = it.type; it.taken = true;
-          if (p.human) { floater(p.x, p.y - 44, WEAPONS[it.type].name + 'を手に入れた'); sfx.open(); }
+          if (p.human) { floater(p.x, p.y, WEAPONS[it.type].name + 'を手に入れた'); sfx.open(); }
         }
       }
       if (p.carry >= 1 && p.rescueCd <= 0) {
@@ -721,30 +731,26 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
     for (const it of G.items) if (it.noT) it.noT -= dt;
     G.items = G.items.filter((i) => !i.taken);
 
-    // ボールの山
     for (const pl of G.piles) {
       pl.age += dt;
       if (pl.z > 0 || pl.vz > 0) {
-        pl.x += pl.vx * dt; pl.y += pl.vy * dt; pl.vz -= 600 * dt; pl.z += pl.vz * dt;
+        pl.x += pl.vx * dt; pl.y += pl.vy * dt; pl.vz -= 700 * dt; pl.z += pl.vz * dt;
         if (pl.z <= 0) { pl.z = 0; pl.vz = 0; pl.vx = pl.vy = 0; resolveWorld(pl, 8); }
       }
     }
     G.piles = G.piles.filter((p) => p.n > 0);
     G.spawnT -= dt;
-    const onGround = G.piles.reduce((s, p) => s + p.n, 0);
     if (G.spawnT <= 0) {
       G.spawnT = rnd(2.5, 4);
-      if (onGround < 140) { const s = freeSpot(10); G.piles.push({ x: s.x, y: s.y, n: Math.ceil(rnd(3, 9)), z: 0, vx: 0, vy: 0, vz: 0, age: 1 }); }
+      if (G.piles.reduce((s, p) => s + p.n, 0) < 140) { const s = freeSpot(10); G.piles.push({ x: s.x, y: s.y, n: Math.ceil(rnd(3, 9)), z: 0, vx: 0, vy: 0, vz: 0, age: 1 }); }
     }
-
-    // 箱の復活(中身はまた隠される)
     for (const b of G.boxes) if (b.open) { b.respawn -= dt; if (b.respawn <= 0) { b.open = false; b.content = pick(['bat', 'pole', 'hammer', 'balls', 'balls', 'empty']); } }
 
     updateVehicles(dt);
 
-    for (const p of G.parts) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.92; p.vy *= 0.92; p.life -= dt; }
+    for (const p of G.parts) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.94; p.vy *= 0.94; p.h = Math.max(0.05, p.h + p.vh * dt); p.vh -= 12 * dt; p.life -= dt; }
     G.parts = G.parts.filter((p) => p.life > 0);
-    for (const f of G.floaters) { f.y -= 30 * dt; f.t -= dt; }
+    for (const f of G.floaters) { f.h += 0.9 * dt; f.t -= dt; }
     G.floaters = G.floaters.filter((f) => f.t > 0);
     if (G.banner.t > 0) G.banner.t -= dt;
   }
@@ -752,7 +758,7 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
   function updateVehicles(dt) {
     for (const v of G.vehicles) {
       const foes = active(1 - v.team);
-      const target = nearestOf(v.type === 'plane' ? { x: MAP_W / 2, y: MAP_H / 2 } : v, foes);
+      const target = nearestOf(v, foes);
       if (v.type === 'tank') {
         v.t -= dt;
         if (target) {
@@ -763,7 +769,7 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
           v.fire -= dt;
           if (v.fire <= 0 && dist(v, target) < 700) {
             v.fire = 1.0;
-            G.projectiles.push({ x: v.x + Math.cos(a) * 40, y: v.y + Math.sin(a) * 40, vx: Math.cos(a) * 520, vy: Math.sin(a) * 520, team: v.team, life: 1.6, owner: v.owner });
+            G.projectiles.push({ x: v.x + Math.cos(a) * 50, y: v.y + Math.sin(a) * 50, vx: Math.cos(a) * 520, vy: Math.sin(a) * 520, team: v.team, life: 1.6, owner: v.owner });
             if (audible(v.x, v.y)) beep(160, 0.15, 'square', 0.06, -60);
           }
         }
@@ -772,20 +778,18 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
         v.t -= dt; v.rotor += dt * 30;
         const tx = target ? target.x : MAP_W / 2, ty = target ? target.y : MAP_H / 2;
         const a = Math.atan2(ty - v.y, tx - v.x), d = Math.hypot(tx - v.x, ty - v.y);
-        v.ang = a;
-        if (d > 20) { const s = Math.min(260, d * 2); v.x += Math.cos(a) * s * dt; v.y += Math.sin(a) * s * dt; }
+        if (d > 20) { v.ang = a; const s = Math.min(260, d * 2); v.x += Math.cos(a) * s * dt; v.y += Math.sin(a) * s * dt; }
         v.drop -= dt;
-        if (v.drop <= 0 && d < 160) { v.drop = 0.75; G.bombs.push({ x: v.x + rnd(-20, 20), y: v.y + rnd(-20, 20), t: 0.7, max: 0.7, r: 85, team: v.team, owner: v.owner }); }
+        if (v.drop <= 0 && d < 160) { v.drop = 0.75; G.bombs.push({ x: v.x + rnd(-20, 20), y: v.y + rnd(-20, 20), t: 0.7, max: 0.7, r: 85, team: v.team, owner: v.owner, from: 6 }); }
       } else if (v.type === 'plane') {
         if (!v.started || v.x < -260 || v.x > MAP_W + 260) {
           if (v.started) v.passes--;
           if (v.passes <= 0) { v.t = 0; continue; }
           v.started = true; v.dir = pick([1, -1]); v.x = v.dir > 0 ? -250 : MAP_W + 250;
-          const tg = foes.length ? pick(foes) : { y: rnd(200, MAP_H - 200) };
-          v.y = tg.y; v.acc = 0; v.t = 99;
+          v.y = foes.length ? pick(foes).y : rnd(200, MAP_H - 200); v.acc = 0;
         }
         v.x += v.dir * 900 * dt; v.acc += 900 * dt;
-        if (v.acc > 120 && v.x > 0 && v.x < MAP_W) { v.acc = 0; G.bombs.push({ x: v.x, y: v.y + rnd(-25, 25), t: 0.4, max: 0.4, r: 72, team: v.team, owner: v.owner }); }
+        if (v.acc > 120 && v.x > 0 && v.x < MAP_W) { v.acc = 0; G.bombs.push({ x: v.x, y: v.y + rnd(-25, 25), t: 0.45, max: 0.45, r: 72, team: v.team, owner: v.owner, from: 9 }); }
       }
     }
     G.vehicles = G.vehicles.filter((v) => v.t > 0);
@@ -802,268 +806,444 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
       if (b.t <= 0 && !b.done) {
         b.done = true;
         for (const e of active(1 - b.team)) if (Math.hypot(e.x - b.x, e.y - b.y) < b.r) hitPlayer(e, 1, b.owner, b.x, b.y);
-        burst(b.x, b.y, '#ffffff', 14, 260); burst(b.x, b.y, '#ffcf3a', 10, 200);
+        burst(b.x, b.y, '#ffffff', 14, 260, 0.3); burst(b.x, b.y, '#ffcf3a', 10, 200, 0.3);
         if (audible(b.x, b.y)) sfx.boom();
       }
     }
     G.bombs = G.bombs.filter((b) => !b.done);
   }
 
-  // ================= 描画 =================
-  function drawWorld() {
-    // 校庭
-    ctx.fillStyle = '#ead7aa'; ctx.fillRect(0, 0, MAP_W, MAP_H);
-    ctx.fillStyle = TEAM[0].tint; ctx.fillRect(0, 0, 420, MAP_H);
-    ctx.fillStyle = TEAM[1].tint; ctx.fillRect(MAP_W - 420, 0, 420, MAP_H);
-    // 砂のつぶ
-    ctx.fillStyle = 'rgba(160,120,60,.12)';
-    for (let i = 0; i < 260; i++) { const x = (i * 977) % MAP_W, y = (i * 613) % MAP_H; ctx.fillRect(x, y, 4, 4); }
-    // 白線
-    ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 6;
-    ctx.beginPath(); ctx.moveTo(MAP_W / 2, 30); ctx.lineTo(MAP_W / 2, MAP_H - 30); ctx.stroke();
-    ctx.beginPath(); ctx.arc(MAP_W / 2, MAP_H / 2, 170, 0, Math.PI * 2); ctx.stroke();
-    ctx.strokeRect(30, 30, MAP_W - 60, MAP_H - 60);
-    ctx.setLineDash([18, 14]);
-    ctx.beginPath(); ctx.moveTo(420, 30); ctx.lineTo(420, MAP_H - 30); ctx.moveTo(MAP_W - 420, 30); ctx.lineTo(MAP_W - 420, MAP_H - 30); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.font = `48px ${fontDisplay}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('青組陣地', 210, MAP_H / 2 + 330); ctx.fillText('赤組陣地', MAP_W - 210, MAP_H / 2 - 330);
+  // ================= 3D シーン =================
+  const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: !coarse });
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color('#9fd3f5');
+  scene.fog = new THREE.Fog('#9fd3f5', 45, 120);
+  const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 300);
 
-    // 牢屋
-    jails.forEach((j, t) => {
-      ctx.fillStyle = 'rgba(70,60,50,.18)'; ctx.fillRect(j.x, j.y, j.w, j.h);
-      ctx.strokeStyle = TEAM[t].dark; ctx.lineWidth = 6; ctx.strokeRect(j.x, j.y, j.w, j.h);
-      ctx.lineWidth = 3; ctx.beginPath();
-      for (let x = j.x + 20; x < j.x + j.w; x += 22) { ctx.moveTo(x, j.y); ctx.lineTo(x, j.y + j.h); }
-      ctx.stroke();
-      ctx.fillStyle = TEAM[t].dark; ctx.font = `26px ${fontDisplay}`;
-      ctx.fillText(`牢屋(${TEAM[1 - t].name}用)`, j.x + j.w / 2, t === 0 ? j.y + j.h + 26 : j.y - 22);
-    });
+  scene.add(new THREE.HemisphereLight('#ffffff', '#b89a6a', 0.58));
+  const sun = new THREE.DirectionalLight('#fff4dd', 0.72);
+  sun.position.set(-18, 40, 14);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(coarse ? 1024 : 2048, coarse ? 1024 : 2048);
+  Object.assign(sun.shadow.camera, { left: -38, right: 38, top: 28, bottom: -28, near: 1, far: 120 });
+  sun.shadow.bias = -0.0006;
+  scene.add(sun);
 
+  function resize() {
+    const w = cv.clientWidth, h = cv.clientHeight;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2));
+    renderer.setSize(w, h, false);
+    camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const matCache = {};
+  const mat = (color, extra) => {
+    const key = color + (extra ? JSON.stringify(extra) : '');
+    return matCache[key] || (matCache[key] = new THREE.MeshLambertMaterial(Object.assign({ color }, extra || {})));
+  };
+  function mesh(geo, material, x = 0, y = 0, z = 0, shadow = true) {
+    const m = new THREE.Mesh(geo, material);
+    m.position.set(x, y, z);
+    m.castShadow = shadow; m.receiveShadow = true;
+    return m;
+  }
+  const GEO = {
+    body: new THREE.CylinderGeometry(0.3, 0.36, 0.72, 16),
+    leg: new THREE.BoxGeometry(0.15, 0.45, 0.15),
+    head: new THREE.SphereGeometry(0.26, 18, 14),
+    eye: new THREE.SphereGeometry(0.035, 6, 6),
+    plate: new THREE.CylinderGeometry(0.38, 0.3, 0.05, 20),
+    ball: new THREE.SphereGeometry(0.11, 12, 10),
+    box: new THREE.BoxGeometry(0.8, 0.8, 0.8),
+    post: new THREE.CylinderGeometry(0.05, 0.05, 2.2, 6),
+    ring: new THREE.RingGeometry(0.55, 0.68, 28),
+  };
+
+  function textTexture(text, { color = '#1f2a37', bg = null, size = 56, font = 'M PLUS Rounded 1c', weight = 800, pad = 14 } = {}) {
+    const c = document.createElement('canvas');
+    const g = c.getContext('2d');
+    const f = `${weight} ${size}px "${font}", "Hiragino Maru Gothic ProN", sans-serif`;
+    g.font = f;
+    const w = Math.ceil(g.measureText(text).width) + pad * 2, h = size + pad * 2;
+    c.width = w; c.height = h;
+    g.font = f; g.textAlign = 'center'; g.textBaseline = 'middle';
+    if (bg) { g.fillStyle = bg; g.strokeStyle = '#1f2a37'; g.lineWidth = 5; roundRectPath(g, 3, 3, w - 6, h - 6, 16); g.fill(); g.stroke(); }
+    g.lineWidth = 9; g.strokeStyle = '#fffaf0'; g.lineJoin = 'round';
+    if (!bg) g.strokeText(text, w / 2, h / 2 + 2);
+    g.fillStyle = color; g.fillText(text, w / 2, h / 2 + 2);
+    const tex = new THREE.CanvasTexture(c);
+    tex.minFilter = THREE.LinearFilter;
+    return { tex, aspect: w / h };
+  }
+  function roundRectPath(g, x, y, w, h, r) {
+    g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+  }
+  function sprite(text, opts = {}, height = 0.42) {
+    const { tex, aspect } = textTexture(text, opts);
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite: false, transparent: true }));
+    s.scale.set(height * aspect, height, 1);
+    return s;
+  }
+  function disposeSprite(s) { s.material.map.dispose(); s.material.dispose(); }
+
+  // ---- 地面(校庭のテクスチャ) ----
+  function fieldTexture() {
+    const k = 0.75, c = document.createElement('canvas');
+    c.width = MAP_W * k; c.height = MAP_H * k;
+    const g = c.getContext('2d');
+    g.scale(k, k);
+    g.fillStyle = '#ead7aa'; g.fillRect(0, 0, MAP_W, MAP_H);
+    g.fillStyle = 'rgba(47,111,214,.12)'; g.fillRect(0, 0, 420, MAP_H);
+    g.fillStyle = 'rgba(224,72,58,.12)'; g.fillRect(MAP_W - 420, 0, 420, MAP_H);
+    for (let i = 0; i < 1400; i++) { g.fillStyle = `rgba(150,110,60,${rnd(0.05, 0.16)})`; g.fillRect((i * 977) % MAP_W, (i * 613 + i * i) % MAP_H, 5, 5); }
+    g.strokeStyle = 'rgba(255,255,255,.92)'; g.lineWidth = 8;
+    g.beginPath(); g.moveTo(MAP_W / 2, 30); g.lineTo(MAP_W / 2, MAP_H - 30); g.stroke();
+    g.beginPath(); g.arc(MAP_W / 2, MAP_H / 2, 170, 0, Math.PI * 2); g.stroke();
+    g.strokeRect(30, 30, MAP_W - 60, MAP_H - 60);
+    g.setLineDash([22, 16]);
+    g.beginPath(); g.moveTo(420, 30); g.lineTo(420, MAP_H - 30); g.moveTo(MAP_W - 420, 30); g.lineTo(MAP_W - 420, MAP_H - 30); g.stroke();
+    g.setLineDash([]);
+    g.font = '64px "Mochiy Pop One", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = 'rgba(255,255,255,.85)';
+    g.save(); g.translate(210, MAP_H / 2 + 300); g.rotate(-Math.PI / 2); g.fillText('青組陣地', 0, 0); g.restore();
+    g.save(); g.translate(MAP_W - 210, MAP_H / 2 - 300); g.rotate(Math.PI / 2); g.fillText('赤組陣地', 0, 0); g.restore();
+    jails.forEach((j) => { g.fillStyle = 'rgba(90,70,50,.25)'; g.fillRect(j.x, j.y, j.w, j.h); });
+    const t = new THREE.CanvasTexture(c);
+    t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    return t;
+  }
+  const world = new THREE.Group();
+  scene.add(world);
+  let groundMat = null;
+  function buildWorld() {
+    const grass = mesh(new THREE.PlaneGeometry(260, 260), mat('#7fb86a'), 0, -0.02, 0, false);
+    grass.rotation.x = -Math.PI / 2; world.add(grass);
+    groundMat = new THREE.MeshLambertMaterial({ map: fieldTexture() });
+    const ground = mesh(new THREE.PlaneGeometry(MAP_W * S, MAP_H * S), groundMat, 0, 0, 0, false);
+    ground.rotation.x = -Math.PI / 2; world.add(ground);
+    // 校舎(背景)
+    const school = new THREE.Group();
+    school.add(mesh(new THREE.BoxGeometry(70, 12, 8), mat('#f1ece2'), 0, 6, 0));
+    for (let i = -6; i <= 6; i++) for (const y of [3.2, 7.8]) school.add(mesh(new THREE.BoxGeometry(3, 2, 0.2), mat('#8fc3e6'), i * 5, y, 4.05, false));
+    school.add(mesh(new THREE.BoxGeometry(6, 4, 6), mat('#f1ece2'), 0, 14, 0));
+    const clock = mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.3, 24), mat('#fffaf0'), 0, 14, 3.05, false);
+    clock.rotation.x = Math.PI / 2; school.add(clock);
+    school.position.set(0, 0, -MAP_H * S / 2 - 14); world.add(school);
+    // 外周の木
+    for (let i = 0; i < 40; i++) {
+      const a = i / 40 * Math.PI * 2, r = 48 + (i % 3) * 3;
+      const x = Math.cos(a) * r * 1.15, z = Math.sin(a) * r * 0.85;
+      if (Math.abs(x) < 40 && z < 0) continue;
+      world.add(mesh(new THREE.CylinderGeometry(0.25, 0.3, 2, 6), mat('#7a5534'), x, 1, z));
+      world.add(mesh(new THREE.SphereGeometry(2.2, 10, 8), mat(i % 2 ? '#4f9a4a' : '#5ea956'), x, 3.4, z));
+    }
     // ベンチ(壁)
     for (const w of walls) {
-      ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.fillRect(w.x + 5, w.y + 6, w.w, w.h);
-      ctx.fillStyle = '#a87a4a'; ctx.fillRect(w.x, w.y, w.w, w.h);
-      ctx.strokeStyle = '#6d4a28'; ctx.lineWidth = 3; ctx.strokeRect(w.x, w.y, w.w, w.h);
+      world.add(mesh(new THREE.BoxGeometry(w.w * S, 0.9, w.h * S), mat('#a87a4a'), wx(w.x + w.w / 2), 0.45, wz(w.y + w.h / 2)));
+      world.add(mesh(new THREE.BoxGeometry(w.w * S + 0.12, 0.1, w.h * S + 0.12), mat('#6d4a28'), wx(w.x + w.w / 2), 0.95, wz(w.y + w.h / 2)));
     }
-    // ボール
-    for (const pl of G.piles) drawPile(pl);
-    // 拾える武器
-    for (const it of G.items) drawItem(it);
-    // 箱
-    for (const b of G.boxes) drawBox(b);
-    // 爆弾の予告
-    for (const b of G.bombs) {
-      const k = 1 - b.t / b.max;
-      ctx.fillStyle = ctx.strokeStyle = TEAM[b.team].color; ctx.lineWidth = 3;
-      ctx.globalAlpha = 0.12 + k * 0.25; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
-      ctx.globalAlpha = 0.85; ctx.stroke();
-      ctx.beginPath(); ctx.arc(b.x, b.y, b.r * k, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1;
-    }
-    for (const v of G.vehicles) if (v.type === 'tank') drawTank(v);
     // 木
     for (const t of trees) {
-      ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.arc(t.x + 8, t.y + 10, t.r, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#4f9a4a'; ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#69b45f'; ctx.beginPath(); ctx.arc(t.x - t.r * 0.25, t.y - t.r * 0.25, t.r * 0.6, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#2f6a2c'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, Math.PI * 2); ctx.stroke();
+      const r = t.r * S;
+      world.add(mesh(new THREE.CylinderGeometry(r * 0.35, r * 0.45, 2, 8), mat('#7a5534'), wx(t.x), 1, wz(t.y)));
+      world.add(mesh(new THREE.SphereGeometry(r * 1.6, 14, 10), mat('#4f9a4a'), wx(t.x), 2.8, wz(t.y)));
+      world.add(mesh(new THREE.SphereGeometry(r * 1.1, 12, 8), mat('#69b45f'), wx(t.x) - r * 0.4, 3.6, wz(t.y) - r * 0.3));
     }
-    // 選手
-    const sorted = [...G.players].sort((a, b) => a.y - b.y);
-    for (const p of sorted) drawPlayer(p);
-    // 草むら(上にかぶさって中身を隠す。近づくと透ける)
+    // 牢屋
+    jails.forEach((j, t) => {
+      const c = mat(TEAM[t].dark);
+      const edges = [[j.x, j.y, j.x + j.w, j.y], [j.x + j.w, j.y, j.x + j.w, j.y + j.h], [j.x + j.w, j.y + j.h, j.x, j.y + j.h], [j.x, j.y + j.h, j.x, j.y]];
+      for (const [x1, y1, x2, y2] of edges) {
+        const len = Math.hypot(x2 - x1, y2 - y1), n = Math.round(len / 22);
+        for (let i = 0; i < n; i++) world.add(mesh(GEO.post, c, wx(x1 + (x2 - x1) * i / n), 1.1, wz(y1 + (y2 - y1) * i / n)));
+        const rail = mesh(new THREE.BoxGeometry(len * S + 0.1, 0.12, 0.12), c, wx((x1 + x2) / 2), 2.2, wz((y1 + y2) / 2));
+        rail.rotation.y = -Math.atan2(y2 - y1, x2 - x1); world.add(rail);
+      }
+      const label = sprite(`牢屋(${TEAM[1 - t].name}用)`, { color: TEAM[t].dark, size: 60 }, 0.9);
+      label.position.set(wx(j.x + j.w / 2), 3.1, wz(j.y + j.h / 2)); world.add(label);
+    });
+    // 草むら(中の箱や武器を隠す。近づくと透ける)
+    for (const b of bushes) {
+      const m = new THREE.MeshLambertMaterial({ color: '#5aa04c', transparent: true, opacity: 1 });
+      const grp = new THREE.Group(), r = b.r * S;
+      for (let i = 0; i < 6; i++) { const a = i * 1.05; grp.add(mesh(new THREE.SphereGeometry(r * 0.62, 12, 9), m, Math.cos(a) * r * 0.5, r * 0.45, Math.sin(a) * r * 0.45)); }
+      grp.add(mesh(new THREE.SphereGeometry(r * 0.6, 12, 9), m, 0, r * 0.75, 0));
+      grp.position.set(wx(b.x), 0, wz(b.y));
+      b.mat = m; world.add(grp);
+    }
+  }
+  buildWorld();
+
+  // ---- 動くもの ----
+  const dyn = new THREE.Group();
+  scene.add(dyn);
+  const ballMat = mat('#ffcf3a');
+  const balls = new THREE.InstancedMesh(GEO.ball, ballMat, 900);
+  balls.castShadow = true; balls.count = 0;
+  balls.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene.add(balls);
+  const partMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.07, 6, 5), new THREE.MeshBasicMaterial({ color: '#ffffff' }), 400);
+  partMesh.count = 0; partMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  partMesh.setColorAt(0, new THREE.Color('#fff'));
+  scene.add(partMesh);
+
+  const boxTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const g = c.getContext('2d');
+    g.fillStyle = '#c99a5c'; g.fillRect(0, 0, 128, 128);
+    g.strokeStyle = '#6d4a28'; g.lineWidth = 8; g.strokeRect(4, 4, 120, 120);
+    g.fillStyle = '#6d4a28'; g.font = '84px "Mochiy Pop One", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('?', 64, 70);
+    return new THREE.CanvasTexture(c);
+  })();
+  const boxMat = new THREE.MeshLambertMaterial({ map: boxTex });
+
+  function makeWeapon(type) {
+    const g = new THREE.Group();
+    const L = WEAPONS[type].len * S;
+    const along = (geo, m, from, len) => { const o = mesh(geo, m); o.rotation.z = -Math.PI / 2; o.position.x = from + len / 2; g.add(o); return o; };
+    if (type === 'sword') {
+      along(new THREE.CylinderGeometry(0.035, 0.035, 0.22, 8), mat('#1f2a37'), 0, 0.22);
+      g.add(mesh(new THREE.BoxGeometry(0.05, 0.05, 0.24), mat('#d9a23a'), 0.22, 0, 0));
+      g.add(mesh(new THREE.BoxGeometry(L - 0.24, 0.05, 0.11), mat('#d6dde6'), 0.24 + (L - 0.24) / 2, 0, 0));
+    } else if (type === 'bat') {
+      along(new THREE.CylinderGeometry(0.085, 0.04, L, 12), mat('#b07a3e'), 0, L);
+    } else if (type === 'pole') {
+      along(new THREE.CylinderGeometry(0.035, 0.035, L, 8), mat('#7fb8d8'), 0, L);
+    } else if (type === 'hammer') {
+      along(new THREE.CylinderGeometry(0.035, 0.035, L, 8), mat('#ffd34d'), 0, L);
+      const head = mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.36, 14), mat('#ff7aa8'), L, 0, 0);
+      head.rotation.x = Math.PI / 2; g.add(head);
+    }
+    return g;
+  }
+
+  function makePlayer(p) {
+    const root = new THREE.Group();
+    const body = new THREE.Group(); root.add(body);
+    const T = TEAM[p.team];
+    body.add(mesh(GEO.body, mat(T.color), 0, 0.82, 0));
+    body.add(mesh(new THREE.CylinderGeometry(0.31, 0.31, 0.12, 16), mat('#fffaf0'), 0, 0.52, 0));
+    const legL = mesh(GEO.leg, mat('#1f2a37'), 0, 0.24, -0.13), legR = mesh(GEO.leg, mat('#1f2a37'), 0, 0.24, 0.13);
+    body.add(legL, legR);
+    body.add(mesh(GEO.head, mat('#ffd9b3'), 0, 1.42, 0));
+    body.add(mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.08, 16), mat(T.dark), 0, 1.5, 0)); // はちまき
+    body.add(mesh(GEO.eye, mat('#1f2a37'), 0.24, 1.45, -0.09, false), mesh(GEO.eye, mat('#1f2a37'), 0.24, 1.45, 0.09, false));
+    body.add(mesh(GEO.plate, mat('#f4f6f8'), 0, 1.72, 0));
+    const plateBalls = [[0, 0.11, -0.12], [0, 0.11, 0.12], [-0.02, 0.22, 0]].map(([x, y, z]) => { const b = mesh(GEO.ball, ballMat, x, 1.72 + y, z); body.add(b); return b; });
+    const pivot = new THREE.Group(); pivot.position.set(0.05, 0.92, 0.38); body.add(pivot);
+    const trail = new THREE.Mesh(new THREE.RingGeometry(0.1, 0.12, 24, 1, 0, 1), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false }));
+    trail.rotation.x = -Math.PI / 2; trail.position.y = 0.92; body.add(trail);
+    const label = sprite(p.human ? 'あなた' : p.name, { color: p.human ? '#1f2a37' : T.dark, size: 52 }, 0.36);
+    label.position.y = 2.3; root.add(label);
+    const help = sprite('たすけて!', { bg: '#fffaf0', size: 48 }, 0.42);
+    help.position.y = 2.75; help.visible = false; root.add(help);
+    if (p.human) {
+      const marker = new THREE.Mesh(GEO.ring, new THREE.MeshBasicMaterial({ color: '#ffcf3a', transparent: true, opacity: 0.9, depthWrite: false }));
+      marker.rotation.x = -Math.PI / 2; marker.position.y = 0.03; root.add(marker);
+    }
+    return { root, body, legL, legR, plateBalls, pivot, trail, help, weaponType: null, weapon: null };
+  }
+
+  function makeTank(v) {
+    const g = new THREE.Group(), c = TEAM[v.team];
+    g.add(mesh(new THREE.BoxGeometry(2.2, 0.55, 1.4), mat(c.color), 0, 0.6, 0));
+    g.add(mesh(new THREE.BoxGeometry(2.3, 0.45, 0.35), mat('#3a3f46'), 0, 0.3, -0.75));
+    g.add(mesh(new THREE.BoxGeometry(2.3, 0.45, 0.35), mat('#3a3f46'), 0, 0.3, 0.75));
+    g.add(mesh(new THREE.CylinderGeometry(0.5, 0.55, 0.4, 16), mat(c.dark), 0, 1.08, 0));
+    const barrel = mesh(new THREE.CylinderGeometry(0.1, 0.1, 1.4, 10), mat(c.dark), 0.8, 1.1, 0);
+    barrel.rotation.z = -Math.PI / 2; g.add(barrel);
+    return { root: g };
+  }
+  function makeHeli(v) {
+    const g = new THREE.Group(), c = TEAM[v.team];
+    const body = mesh(new THREE.SphereGeometry(0.9, 16, 12), mat(c.color), 0, 0, 0); body.scale.set(1.5, 0.9, 0.9); g.add(body);
+    g.add(mesh(new THREE.SphereGeometry(0.5, 12, 10), mat('#bfe3f7'), 0.8, 0.15, 0));
+    g.add(mesh(new THREE.BoxGeometry(2, 0.25, 0.25), mat(c.dark), -1.7, 0.2, 0));
+    g.add(mesh(new THREE.BoxGeometry(0.3, 0.7, 0.08), mat(c.dark), -2.6, 0.45, 0));
+    for (const z of [-0.5, 0.5]) g.add(mesh(new THREE.BoxGeometry(1.8, 0.08, 0.08), mat('#3a3f46'), 0, -0.9, z));
+    const rotor = new THREE.Group(); rotor.position.y = 0.95; g.add(rotor);
+    rotor.add(mesh(new THREE.BoxGeometry(4.6, 0.05, 0.25), mat('#3a3f46')), mesh(new THREE.BoxGeometry(0.25, 0.05, 4.6), mat('#3a3f46')));
+    g.position.y = 6;
+    return { root: g, rotor };
+  }
+  function makePlane(v) {
+    const g = new THREE.Group(), c = TEAM[v.team];
+    const f = mesh(new THREE.CylinderGeometry(0.35, 0.25, 3.6, 12), mat(c.color), 0, 0, 0); f.rotation.z = -Math.PI / 2; g.add(f);
+    const nose = mesh(new THREE.ConeGeometry(0.35, 0.6, 12), mat(c.dark), 2.1, 0, 0); nose.rotation.z = -Math.PI / 2; g.add(nose);
+    g.add(mesh(new THREE.BoxGeometry(1, 0.1, 4.6), mat(c.color), 0.2, 0, 0));
+    g.add(mesh(new THREE.BoxGeometry(0.6, 0.08, 1.8), mat(c.dark), -1.5, 0.05, 0));
+    g.add(mesh(new THREE.BoxGeometry(0.6, 0.8, 0.08), mat(c.dark), -1.5, 0.4, 0));
+    g.position.y = 9;
+    return { root: g };
+  }
+  function makeBomb(b) {
+    const c = TEAM[b.team].color;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(b.r * S - 0.12, b.r * S, 40), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.85, depthWrite: false }));
+    const fill = new THREE.Mesh(new THREE.CircleGeometry(b.r * S, 40), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.2, depthWrite: false }));
+    const g = new THREE.Group(); ring.rotation.x = fill.rotation.x = -Math.PI / 2; g.add(ring, fill); g.position.y = 0.04;
+    return { root: g, fill };
+  }
+  function makeBox() { return { root: mesh(GEO.box, boxMat, 0, 0.4, 0) }; }
+  function makeItem(it) {
+    const holder = new THREE.Group(), spin = new THREE.Group();
+    const w = makeWeapon(it.type); w.position.x = -WEAPONS[it.type].len * S / 2; spin.add(w);
+    const glow = new THREE.Mesh(new THREE.CircleGeometry(0.6, 24), new THREE.MeshBasicMaterial({ color: '#ffcf3a', transparent: true, opacity: 0.4, depthWrite: false }));
+    glow.rotation.x = -Math.PI / 2; glow.position.y = 0.03;
+    holder.add(spin, glow);
+    return { root: holder, spin };
+  }
+  function makeFloater(f) { const s = sprite(f.text, { color: f.color, size: 56 }, 0.5); return { root: s, sprite: s }; }
+
+  // エンティティ配列と3Dオブジェクトを対応させる
+  const views = new Map();
+  let frameNo = 0;
+  function sync(list, make) {
+    for (const e of list) {
+      let v = views.get(e);
+      if (!v) { v = make(e); views.set(e, v); dyn.add(v.root); }
+      v.seen = frameNo;
+    }
+  }
+  function dropView(v) { dyn.remove(v.root); v.root.traverse((o) => { if (o.isSprite) disposeSprite(o); }); }
+  function sweep() { for (const [e, v] of views) if (v.seen !== frameNo) { dropView(v); views.delete(e); } }
+  function clearViews() { for (const [, v] of views) dropView(v); views.clear(); }
+
+  const tmpM = new THREE.Matrix4(), tmpQ = new THREE.Quaternion(), tmpS = new THREE.Vector3(), tmpP = new THREE.Vector3(), tmpC = new THREE.Color();
+  function syncScene(dt) {
+    frameNo++;
+    sync(G.players, makePlayer); sync(G.boxes, makeBox); sync(G.items, makeItem); sync(G.bombs, makeBomb); sync(G.floaters, makeFloater);
+    sync(G.vehicles, (v) => (v.type === 'tank' ? makeTank : v.type === 'heli' ? makeHeli : makePlane)(v));
+    sweep();
+
+    for (const p of G.players) {
+      const v = views.get(p);
+      v.root.position.set(wx(p.x), 0, wz(p.y));
+      v.body.rotation.y = -p.face;
+      v.root.visible = !(p.inv > 0 && !p.jailed && Math.floor(p.inv * 14) % 2 === 0);
+      const sw = Math.sin(p.step) * 0.6;
+      v.legL.rotation.z = sw; v.legR.rotation.z = -sw;
+      v.plateBalls.forEach((b, i) => { b.visible = i < p.plate; });
+      if (v.weaponType !== p.weapon) {
+        if (v.weapon) v.pivot.remove(v.weapon);
+        v.weapon = makeWeapon(p.weapon); v.pivot.add(v.weapon); v.weaponType = p.weapon;
+      }
+      v.pivot.visible = !p.jailed;
+      const W_ = WEAPONS[p.weapon];
+      if (p.swingT > 0) {
+        const k = 1 - p.swingT / 0.2;
+        v.pivot.rotation.set(0, W_.arc / 2 - W_.arc * k - 0.3, -0.15);
+        v.trail.visible = true;
+        v.trail.geometry.dispose();
+        v.trail.geometry = new THREE.RingGeometry(W_.range * S - 0.12, W_.range * S, 20, 1, W_.arc / 2 - W_.arc * k, W_.arc * k);
+        v.trail.material.opacity = 0.7 * (1 - k * 0.5);
+      } else {
+        v.pivot.rotation.set(0, -0.9, 0.7);
+        v.trail.visible = false;
+      }
+      v.help.visible = p.jailed && Math.sin(G.t * 2 + p.id) > 0.2;
+    }
+    for (const b of G.boxes) {
+      const v = views.get(b);
+      v.root.position.set(wx(b.x), b.open ? 0.08 : 0.4, wz(b.y));
+      v.root.scale.set(1, b.open ? 0.2 : 1, 1);
+      v.root.material = b.open ? mat('#9b7848') : boxMat;
+    }
+    for (const it of G.items) {
+      const v = views.get(it);
+      v.root.position.set(wx(it.x), 0, wz(it.y));
+      v.spin.position.y = 0.5 + Math.sin(G.t * 3 + it.x) * 0.12;
+      v.spin.rotation.y += dt * 1.5;
+    }
+    for (const b of G.bombs) {
+      const v = views.get(b);
+      v.root.position.x = wx(b.x); v.root.position.z = wz(b.y);
+      v.fill.material.opacity = 0.15 + (1 - b.t / b.max) * 0.35;
+    }
+    for (const f of G.floaters) {
+      const v = views.get(f);
+      v.root.position.set(wx(f.x), f.h, wz(f.y));
+      v.sprite.material.opacity = Math.min(1, f.t * 2);
+    }
+    for (const veh of G.vehicles) {
+      const v = views.get(veh);
+      if (veh.type === 'plane') { v.root.visible = veh.started; v.root.rotation.y = veh.dir > 0 ? 0 : Math.PI; }
+      else v.root.rotation.y = -veh.ang;
+      v.root.position.x = wx(veh.x); v.root.position.z = wz(veh.y);
+      if (v.rotor) v.rotor.rotation.y = veh.rotor;
+    }
+    // 草むら:自分が近いと透ける
     const h = human();
     for (const b of bushes) {
-      const near = Math.hypot(h.x - b.x, h.y - b.y) < b.r + 40;
-      ctx.globalAlpha = near ? 0.45 : 0.96;
-      ctx.fillStyle = '#5aa04c';
-      for (let i = 0; i < 6; i++) { const a = i * 1.05; ctx.beginPath(); ctx.arc(b.x + Math.cos(a) * b.r * 0.45, b.y + Math.sin(a) * b.r * 0.4, b.r * 0.55, 0, Math.PI * 2); ctx.fill(); }
-      ctx.fillStyle = '#74bb63'; ctx.beginPath(); ctx.arc(b.x - 8, b.y - 8, b.r * 0.45, 0, Math.PI * 2); ctx.fill();
-      ctx.globalAlpha = 1;
+      const near = !G.demo && Math.hypot(h.x - b.x, h.y - b.y) < b.r + 60;
+      b.mat.opacity += ((near ? 0.35 : 1) - b.mat.opacity) * 0.2;
+      b.mat.depthWrite = b.mat.opacity > 0.95;
     }
-    // 砲弾
-    for (const pr of G.projectiles) {
-      ctx.fillStyle = '#ffcf3a'; ctx.strokeStyle = '#1f2a37'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(pr.x, pr.y, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+    // ボール(地面・飛んでいる・砲弾・落ちてくる爆弾)
+    let n = 0;
+    const put = (x, y, z, s) => { if (n >= 900) return; tmpP.set(x, y, z); tmpS.set(s, s, s); tmpM.compose(tmpP, tmpQ, tmpS); balls.setMatrixAt(n++, tmpM); };
+    for (const pl of G.piles) {
+      const shown = Math.min(pl.n, 10);
+      for (let i = 0; i < shown; i++) {
+        const a = i * 2.4, top = i >= 7, r = i === 0 ? 0 : top ? 0.09 : 0.16 + (i % 3) * 0.05;
+        put(wx(pl.x) + Math.cos(a) * r, 0.11 + pl.z * S + (top ? 0.17 : 0), wz(pl.y) + Math.sin(a) * r, 1);
+      }
     }
-    for (const v of G.vehicles) if (v.type !== 'tank') (v.type === 'heli' ? drawHeli : drawPlane)(v);
-    // 粒・文字
-    for (const p of G.parts) { ctx.globalAlpha = Math.min(1, p.life * 2); ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill(); }
-    ctx.globalAlpha = 1;
-    ctx.font = `800 20px ${fontBody}`;
-    for (const f of G.floaters) {
-      ctx.globalAlpha = Math.min(1, f.t * 2);
-      ctx.lineWidth = 4; ctx.strokeStyle = '#fffaf0'; ctx.strokeText(f.text, f.x, f.y);
-      ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, f.y);
+    for (const pr of G.projectiles) put(wx(pr.x), 1.1, wz(pr.y), 1.8);
+    for (const b of G.bombs) put(wx(b.x), 0.2 + b.from * (b.t / b.max), wz(b.y), 2);
+    balls.count = n; balls.instanceMatrix.needsUpdate = true;
+
+    let m = 0;
+    for (const p of G.parts) {
+      if (m >= 400) break;
+      tmpP.set(wx(p.x), p.h, wz(p.y)); const s = Math.max(0.2, p.life * 1.4); tmpS.set(s, s, s);
+      tmpM.compose(tmpP, tmpQ, tmpS); partMesh.setMatrixAt(m, tmpM); partMesh.setColorAt(m, tmpC.set(p.color)); m++;
     }
-    ctx.globalAlpha = 1;
+    partMesh.count = m; partMesh.instanceMatrix.needsUpdate = true;
+    if (partMesh.instanceColor) partMesh.instanceColor.needsUpdate = true;
   }
 
-  function drawBall(x, y, r = 6) {
-    ctx.fillStyle = '#ffcf3a'; ctx.strokeStyle = '#8a6a00'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.beginPath(); ctx.arc(x - r * 0.35, y - r * 0.35, r * 0.3, 0, Math.PI * 2); ctx.fill();
-  }
-  function drawPile(pl) {
-    if (pl.z > 0) { ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.arc(pl.x, pl.y, 6, 0, Math.PI * 2); ctx.fill(); }
-    const shown = Math.min(pl.n, 7);
-    for (let i = 0; i < shown; i++) {
-      const a = i * 2.4, r = i === 0 ? 0 : 7 + (i % 3) * 2;
-      drawBall(pl.x + Math.cos(a) * r, pl.y + Math.sin(a) * r - pl.z);
-    }
-    if (pl.n > 7) { ctx.font = `800 14px ${fontBody}`; ctx.fillStyle = '#1f2a37'; ctx.fillText(`×${pl.n}`, pl.x, pl.y + 22); }
-  }
-  function drawWeaponShape(type, x, y, ang, scale = 1) {
-    const w = WEAPONS[type];
-    ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.scale(scale, scale);
-    ctx.lineCap = 'round'; ctx.strokeStyle = '#1f2a37'; ctx.lineWidth = type === 'bat' ? 11 : 8;
-    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(w.len, 0); ctx.stroke();
-    ctx.strokeStyle = w.color; ctx.lineWidth = type === 'bat' ? 7 : 4.5;
-    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(w.len, 0); ctx.stroke();
-    if (type === 'sword') { ctx.strokeStyle = '#1f2a37'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(8, -6); ctx.lineTo(8, 6); ctx.stroke(); }
-    if (type === 'hammer') { ctx.fillStyle = '#ff7aa8'; ctx.strokeStyle = '#1f2a37'; ctx.lineWidth = 2; ctx.fillRect(w.len - 6, -10, 14, 20); ctx.strokeRect(w.len - 6, -10, 14, 20); }
-    ctx.restore();
-  }
-  function drawItem(it) {
-    const bob = Math.sin(G.t * 4 + it.x) * 3;
-    ctx.fillStyle = 'rgba(255,207,58,.35)'; ctx.beginPath(); ctx.arc(it.x, it.y, 26, 0, Math.PI * 2); ctx.fill();
-    drawWeaponShape(it.type, it.x - WEAPONS[it.type].len / 2 * 0.8, it.y + bob, -0.5, 0.8);
-  }
-  function drawBox(b) {
-    if (b.open) {
-      ctx.fillStyle = 'rgba(160,120,70,.45)'; ctx.fillRect(b.x - 18, b.y - 10, 36, 20);
+  // ---- カメラ ----
+  const camTarget = new THREE.Vector3(), camPos = new THREE.Vector3();
+  let demoYaw = 0;
+  function updateCamera(dt) {
+    if (G.demo) {
+      demoYaw += dt * 0.08;
+      camTarget.set(0, 0, 2);
+      camPos.set(Math.cos(demoYaw) * -34, 24, Math.sin(demoYaw) * -26);
+      camera.position.lerp(camPos, 0.05);
+      camera.lookAt(camTarget);
       return;
     }
-    ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.fillRect(b.x - 14, b.y - 10, 32, 30);
-    ctx.fillStyle = '#c99a5c'; ctx.strokeStyle = '#6d4a28'; ctx.lineWidth = 2.5;
-    ctx.fillRect(b.x - 16, b.y - 16, 32, 30); ctx.strokeRect(b.x - 16, b.y - 16, 32, 30);
-    ctx.beginPath(); ctx.moveTo(b.x - 16, b.y - 4); ctx.lineTo(b.x + 16, b.y - 4); ctx.stroke();
-    ctx.fillStyle = '#6d4a28'; ctx.font = `18px ${fontDisplay}`; ctx.fillText('?', b.x, b.y + 5);
-  }
-  function drawPlayer(p) {
-    const T = TEAM[p.team];
-    const blink = p.inv > 0 && !p.jailed && Math.floor(p.inv * 14) % 2 === 0;
-    ctx.globalAlpha = p.jailed ? 0.75 : blink ? 0.45 : 1;
-    // 影
-    ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(p.x + 4, p.y + 14, 18, 8, 0, 0, Math.PI * 2); ctx.fill();
-    // 足
-    const s = Math.sin(p.step) * 6;
-    ctx.fillStyle = '#1f2a37';
-    ctx.beginPath(); ctx.arc(p.x - 7, p.y + 12 + s * 0.4, 5, 0, Math.PI * 2); ctx.arc(p.x + 7, p.y + 12 - s * 0.4, 5, 0, Math.PI * 2); ctx.fill();
-    // 体(体操服+ゼッケンの色)
-    ctx.fillStyle = T.color; ctx.strokeStyle = '#1f2a37'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(p.x, p.y, PLAYER_R, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    // 武器
-    const W_ = WEAPONS[p.weapon];
-    let a = p.face + 0.9;
-    if (p.swingT > 0) a = p.face - W_.arc / 2 + W_.arc * (1 - p.swingT / 0.2);
-    if (!p.jailed) drawWeaponShape(p.weapon, p.x + Math.cos(p.face + 0.6) * 12, p.y + Math.sin(p.face + 0.6) * 12, a);
-    if (p.swingT > 0) {
-      ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 5;
-      ctx.beginPath(); ctx.arc(p.x, p.y, W_.range, p.face - W_.arc / 2, p.face - W_.arc / 2 + W_.arc * (1 - p.swingT / 0.2)); ctx.stroke();
-    }
-    // 頭
-    ctx.fillStyle = '#ffd9b3'; ctx.strokeStyle = '#1f2a37'; ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.arc(p.x, p.y - 4, 11, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    // お皿とボール
-    ctx.fillStyle = '#f4f6f8'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.ellipse(p.x, p.y - 16, 16, 7, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    const pos = [[-8, -18], [8, -18], [0, -22]];
-    for (let i = 0; i < p.plate; i++) drawBall(p.x + pos[i][0], p.y + pos[i][1], 5.5);
-    ctx.globalAlpha = 1;
-    // 名前
-    ctx.font = `800 13px ${fontBody}`; ctx.lineWidth = 3; ctx.strokeStyle = '#fffaf0';
-    const label = p.human ? `${p.name}(あなた)` : p.name;
-    ctx.strokeText(label, p.x, p.y - 38); ctx.fillStyle = p.human ? '#1f2a37' : T.dark; ctx.fillText(label, p.x, p.y - 38);
-    if (p.carry > 0 && !p.jailed) { ctx.font = `800 11px ${fontBody}`; ctx.strokeText(`●${p.carry}`, p.x, p.y + 30); ctx.fillStyle = '#8a6a00'; ctx.fillText(`●${p.carry}`, p.x, p.y + 30); }
-    if (p.jailed && Math.sin(G.t * 2 + p.id) > 0.6) {
-      ctx.fillStyle = '#fffaf0'; ctx.strokeStyle = '#1f2a37'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(p.x - 34, p.y - 70, 68, 22, 8) : ctx.rect(p.x - 34, p.y - 70, 68, 22); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#1f2a37'; ctx.font = `800 12px ${fontBody}`; ctx.fillText('たすけて!', p.x, p.y - 59);
-    }
-    if (p.human) {
-      ctx.strokeStyle = '#ffcf3a'; ctx.lineWidth = 3; ctx.setLineDash([6, 5]);
-      ctx.beginPath(); ctx.arc(p.x, p.y, PLAYER_R + 8, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
-    }
-  }
-  function drawTank(v) {
-    const c = TEAM[v.team];
-    ctx.save(); ctx.translate(v.x, v.y); ctx.rotate(v.ang);
-    ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.fillRect(-30, -22, 64, 48);
-    ctx.fillStyle = '#3a3f46'; ctx.fillRect(-34, -28, 68, 12); ctx.fillRect(-34, 16, 68, 12);
-    ctx.fillStyle = c.color; ctx.strokeStyle = '#1f2a37'; ctx.lineWidth = 3;
-    ctx.fillRect(-30, -18, 60, 36); ctx.strokeRect(-30, -18, 60, 36);
-    ctx.fillStyle = c.dark; ctx.beginPath(); ctx.arc(0, 0, 14, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillRect(0, -4, 44, 8); ctx.strokeRect(0, -4, 44, 8);
-    ctx.restore();
-  }
-  function drawHeli(v) {
-    const c = TEAM[v.team];
-    ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(v.x + 30, v.y + 50, 40, 18, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.save(); ctx.translate(v.x, v.y); ctx.rotate(v.ang);
-    ctx.fillStyle = c.color; ctx.strokeStyle = '#1f2a37'; ctx.lineWidth = 3;
-    ctx.fillRect(-60, -5, 40, 10); ctx.strokeRect(-60, -5, 40, 10);
-    ctx.beginPath(); ctx.ellipse(0, 0, 32, 20, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#bfe3f7'; ctx.beginPath(); ctx.ellipse(14, 0, 12, 12, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.rotate(v.rotor); ctx.strokeStyle = 'rgba(31,42,55,.75)'; ctx.lineWidth = 5;
-    ctx.beginPath(); ctx.moveTo(-60, 0); ctx.lineTo(60, 0); ctx.moveTo(0, -60); ctx.lineTo(0, 60); ctx.stroke();
-    ctx.restore();
-  }
-  function drawPlane(v) {
-    if (!v.started) return;
-    const c = TEAM[v.team];
-    ctx.fillStyle = 'rgba(0,0,0,.16)';
-    ctx.save(); ctx.translate(v.x + 40, v.y + 70); ctx.scale(v.dir, 1); ctx.fillRect(-50, -8, 100, 16); ctx.fillRect(-10, -55, 30, 110); ctx.restore();
-    ctx.save(); ctx.translate(v.x, v.y); ctx.scale(v.dir, 1);
-    ctx.fillStyle = c.color; ctx.strokeStyle = '#1f2a37'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(60, 0); ctx.lineTo(40, -10); ctx.lineTo(-50, -10); ctx.lineTo(-50, 10); ctx.lineTo(40, 10); ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(15, -10); ctx.lineTo(-10, -60); ctx.lineTo(-25, -60); ctx.lineTo(-15, -10); ctx.moveTo(15, 10); ctx.lineTo(-10, 60); ctx.lineTo(-25, 60); ctx.lineTo(-15, 10); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-40, -10); ctx.lineTo(-55, -28); ctx.lineTo(-60, -28); ctx.lineTo(-55, -10); ctx.moveTo(-40, 10); ctx.lineTo(-55, 28); ctx.lineTo(-60, 28); ctx.lineTo(-55, 10); ctx.fill(); ctx.stroke();
-    ctx.restore();
-  }
-
-  function drawMinimap() {
-    const mw = Math.min(180, W * 0.3), mh = mw * MAP_H / MAP_W;
-    const x0 = W - mw - Math.max(16, 0), y0 = 52;
-    const s = mw / MAP_W;
-    ctx.fillStyle = 'rgba(255,250,240,.85)'; ctx.strokeStyle = '#1f2a37'; ctx.lineWidth = 2;
-    ctx.fillRect(x0, y0, mw, mh); ctx.strokeRect(x0, y0, mw, mh);
-    jails.forEach((j, t) => { ctx.fillStyle = TEAM[t].tint.replace('.10', '.45'); ctx.fillRect(x0 + j.x * s, y0 + j.y * s, j.w * s, j.h * s); });
-    ctx.fillStyle = 'rgba(31,42,55,.35)'; for (const w of walls) ctx.fillRect(x0 + w.x * s, y0 + w.y * s, Math.max(2, w.w * s), Math.max(2, w.h * s));
-    for (const p of G.players) {
-      ctx.fillStyle = TEAM[p.team].color;
-      ctx.beginPath(); ctx.arc(x0 + p.x * s, y0 + p.y * s, p.human ? 4 : 2.6, 0, Math.PI * 2); ctx.fill();
-      if (p.human) { ctx.strokeStyle = '#1f2a37'; ctx.lineWidth = 1.5; ctx.stroke(); }
-    }
-    for (const v of G.vehicles) { ctx.fillStyle = '#1f2a37'; ctx.fillRect(x0 + v.x * s - 3, y0 + v.y * s - 3, 6, 6); }
-    ctx.strokeStyle = 'rgba(31,42,55,.6)'; ctx.lineWidth = 1;
-    ctx.strokeRect(x0 + G.cam.x * s, y0 + G.cam.y * s, W / zoom * s, H / zoom * s);
-  }
-
-  function drawJoystick() {
-    if (joy.id === null) return;
-    ctx.strokeStyle = 'rgba(31,42,55,.5)'; ctx.lineWidth = 3; ctx.fillStyle = 'rgba(255,250,240,.35)';
-    ctx.beginPath(); ctx.arc(joy.ox, joy.oy, 50, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    const dx = joy.x - joy.ox, dy = joy.y - joy.oy, d = Math.hypot(dx, dy), k = d > 50 ? 50 / d : 1;
-    ctx.fillStyle = 'rgba(31,42,55,.55)'; ctx.beginPath(); ctx.arc(joy.ox + dx * k, joy.oy + dy * k, 22, 0, Math.PI * 2); ctx.fill();
-  }
-
-  let fontDisplay = '', fontBody = '';
-  function render() {
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    ctx.fillStyle = '#ead7aa'; ctx.fillRect(0, 0, W, H);
-    if (!G) return;
     const h = human();
-    const vw = W / zoom, vh = H / zoom;
-    const tx = clamp(h.x - vw / 2, Math.min(0, MAP_W - vw) - 60, Math.max(0, MAP_W - vw) + 60);
-    const ty = clamp(h.y - vh / 2, Math.min(0, MAP_H - vh) - 60, Math.max(0, MAP_H - vh) + 60);
-    G.cam.x += (tx - G.cam.x) * 0.15; G.cam.y += (ty - G.cam.y) * 0.15;
-    ctx.save(); ctx.scale(zoom, zoom); ctx.translate(-G.cam.x, -G.cam.y);
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    drawWorld();
-    ctx.restore();
-    if (mode === 'play' || mode === 'result') drawMinimap();
-    drawJoystick();
+    const fx = Math.cos(cam.yaw), fz = Math.sin(cam.yaw);
+    camTarget.set(wx(h.x) + fx * 1.5, 1.3, wz(h.y) + fz * 1.5);
+    const hd = cam.dist * Math.cos(cam.pitch);
+    camPos.set(wx(h.x) - fx * hd, 1.3 + cam.dist * Math.sin(cam.pitch), wz(h.y) - fz * hd);
+    camera.position.lerp(camPos, Math.min(1, dt * 10));
+    camera.lookAt(camTarget);
+  }
+
+  // ---- ミニマップ ----
+  const mini = $('mini'), mctx = mini.getContext('2d');
+  function drawMinimap() {
+    const mw = mini.width, mh = mini.height, s = mw / MAP_W;
+    mctx.fillStyle = '#ead7aa'; mctx.fillRect(0, 0, mw, mh);
+    jails.forEach((j, t) => { mctx.fillStyle = TEAM[t].color; mctx.globalAlpha = 0.35; mctx.fillRect(j.x * s, j.y * s, j.w * s, j.h * s); mctx.globalAlpha = 1; });
+    mctx.fillStyle = 'rgba(109,74,40,.7)'; for (const w of walls) mctx.fillRect(w.x * s, w.y * s, Math.max(3, w.w * s), Math.max(3, w.h * s));
+    mctx.fillStyle = 'rgba(79,154,74,.8)'; for (const t of trees) { mctx.beginPath(); mctx.arc(t.x * s, t.y * s, t.r * s, 0, Math.PI * 2); mctx.fill(); }
+    for (const p of G.players) {
+      mctx.fillStyle = TEAM[p.team].color;
+      mctx.beginPath(); mctx.arc(p.x * s, p.y * s, p.human ? 7 : 5, 0, Math.PI * 2); mctx.fill();
+      if (p.human) {
+        mctx.strokeStyle = '#1f2a37'; mctx.lineWidth = 2.5; mctx.stroke();
+        mctx.beginPath(); mctx.moveTo(p.x * s, p.y * s); mctx.lineTo(p.x * s + Math.cos(cam.yaw) * 18, p.y * s + Math.sin(cam.yaw) * 18); mctx.stroke();
+      }
+    }
+    mctx.fillStyle = '#1f2a37'; for (const v of G.vehicles) if (v.type !== 'plane' || v.started) mctx.fillRect(v.x * s - 5, v.y * s - 5, 10, 10);
   }
 
   let hudCache = '';
@@ -1090,15 +1270,18 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
   // ================= 進行 =================
   function start() {
     const size = Number(document.querySelector('input[name="size"]:checked')?.value || 5);
+    clearViews();
     G = newMatch(size);
     mode = 'play'; hudCache = '';
+    cam.yaw = 0; cam.pitch = 0.5;
+    const h = human();
+    camera.position.set(wx(h.x) - 8, 6, wz(h.y));
     $('title').hidden = true; $('result').hidden = true; $('hud').hidden = false;
     $('touchBtns').hidden = !coarse;
     $('keyHint').hidden = coarse;
+    $('lockhint').hidden = coarse || locked();
     $('log').innerHTML = '';
     banner('バトル開始!');
-    const h = human();
-    G.cam.x = h.x - W / zoom / 2; G.cam.y = h.y - H / zoom / 2;
     beep(660, 0.12, 'triangle', 0.08);
   }
   $('startBtn').addEventListener('click', start);
@@ -1107,16 +1290,22 @@ button:focus-visible, .opts label:focus-within { outline: 3px solid var(--ball);
   // デバッグ用: コンソールから __kaito.G で状態を見られる
   window.__kaito = { get G() { return G; }, summon };
 
-  // タイトル裏で流すデモ試合(全員ボット・音とログなし)
+  // タイトル裏ではボットどうしのデモ試合を流す
   G = newMatch(5, true);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (G.demo) { clearViews(); G = newMatch(5, true); } });
   let last = performance.now();
   function frame(now) {
     const dt = Math.min(0.033, (now - last) / 1000);
     last = now;
-    if (!fontDisplay) { const cs = getComputedStyle(document.documentElement); fontDisplay = cs.getPropertyValue('--font-display'); fontBody = cs.getPropertyValue('--font-body'); }
     if (mode === 'play') { update(dt); if (mode === 'play') updateHud(); }
-    else if (mode === 'title') { if (!G.demo || G.over || G.t > 90) G = newMatch(5, true); update(dt); }
-    render();
+    else if (mode === 'title') {
+      if (!G.demo || G.over || G.t > 90) { clearViews(); G = newMatch(5, true); }
+      update(dt);
+    }
+    syncScene(dt);
+    updateCamera(dt);
+    if (mode === 'play') drawMinimap();
+    renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
